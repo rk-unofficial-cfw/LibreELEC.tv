@@ -1,0 +1,12 @@
+diff -ruPN u-boot/arch/arm/dts/rk3328-roc-cc.dts u-boot-new/arch/arm/dts/rk3328-roc-cc.dts
+--- u-boot/arch/arm/dts/rk3328-roc-cc.dts	2024-01-08 16:37:48.000000000 +0100
++++ u-boot-new/arch/arm/dts/rk3328-roc-cc.dts	2024-04-29 18:30:42.982000132 +0200
+@@ -231,6 +231,8 @@
+ 				regulator-name = "vcc_ddr";
+ 				regulator-always-on;
+ 				regulator-boot-on;
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+ 				};
