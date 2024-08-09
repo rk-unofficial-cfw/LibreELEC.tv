@@ -1,0 +1,803 @@
+From 4707a7fe2103b7600b2ca6097ce9d12bda37d4cf Mon Sep 17 00:00:00 2001
+From: Finley Xiao <finley.xiao@rock-chips.com>
+Date: Thu, 22 Jun 2017 20:22:25 +0800
+Subject: [PATCH] clk: rockchip: rk3228: fix some PLL_NUX_CLKs' gates
+
+Some PLL_NUX_CLKs' gates is actually behind muxs according to latest TRM,
+so move the gates to composite clocks and amend their parent clocks.
+
+Change-Id: Ib6043caa61e9df0473f2d0bdc756850968bb2a55
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 49 ++++++++++---------------------
+ 1 file changed, 15 insertions(+), 34 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index c1ef00247e26..6da33172c6ba 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -134,24 +134,22 @@ static const struct rockchip_cpuclk_reg_data rk3228_cpuclk_data = {
+ 
+ PNAME(mux_pll_p)		= { "clk_24m", "xin24m" };
+ 
+-PNAME(mux_ddrphy_p)		= { "dpll_ddr", "gpll_ddr", "apll_ddr" };
++PNAME(mux_ddrphy_p)		= { "dpll", "gpll", "apll" };
+ PNAME(mux_armclk_p)		= { "apll_core", "gpll_core", "dpll_core" };
+ PNAME(mux_usb480m_phy_p)	= { "usb480m_phy0", "usb480m_phy1" };
+ PNAME(mux_usb480m_p)		= { "usb480m_phy", "xin24m" };
+ PNAME(mux_hdmiphy_p)		= { "hdmiphy_phy", "xin24m" };
+-PNAME(mux_aclk_cpu_src_p)	= { "cpll_aclk_cpu", "gpll_aclk_cpu", "hdmiphy_aclk_cpu" };
+ 
+ PNAME(mux_pll_src_4plls_p)	= { "cpll", "gpll", "hdmiphy", "usb480m" };
+ PNAME(mux_pll_src_3plls_p)	= { "cpll", "gpll", "hdmiphy" };
+ PNAME(mux_pll_src_2plls_p)	= { "cpll", "gpll" };
+ PNAME(mux_sclk_hdmi_cec_p)	= { "cpll", "gpll", "xin24m" };
+-PNAME(mux_aclk_peri_src_p)	= { "cpll_peri", "gpll_peri", "hdmiphy_peri" };
+ PNAME(mux_mmc_src_p)		= { "cpll", "gpll", "xin24m", "usb480m" };
+ PNAME(mux_pll_src_cpll_gpll_usb480m_p)	= { "cpll", "gpll", "usb480m" };
+ 
+ PNAME(mux_sclk_rga_p)		= { "gpll", "cpll", "sclk_rga_src" };
+ 
+-PNAME(mux_sclk_vop_src_p)	= { "gpll_vop", "cpll_vop" };
++PNAME(mux_sclk_vop_src_p)	= { "gpll", "cpll" };
+ PNAME(mux_dclk_vop_p)		= { "hdmiphy", "sclk_vop_pre" };
+ 
+ PNAME(mux_i2s0_p)		= { "i2s0_src", "i2s0_frac", "ext_i2s", "xin12m" };
+@@ -220,27 +218,23 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(4), 8, 5, DFLAGS),
+ 
+ 	/* PD_DDR */
+-	GATE(0, "apll_ddr", "apll", CLK_IGNORE_UNUSED,
++	COMPOSITE(0, "clk_ddrphy_src", mux_ddrphy_p, CLK_IGNORE_UNUSED,
++			RK2928_CLKSEL_CON(26), 8, 2, MFLAGS, 0, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
+ 			RK2928_CLKGATE_CON(0), 2, GFLAGS),
+-	GATE(0, "dpll_ddr", "dpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(0), 2, GFLAGS),
+-	GATE(0, "gpll_ddr", "gpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(0), 2, GFLAGS),
+-	COMPOSITE(0, "ddrphy4x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
+-			RK2928_CLKSEL_CON(26), 8, 2, MFLAGS, 0, 3, DFLAGS | CLK_DIVIDER_POWER_OF_TWO,
++	GATE(0, "ddrphy4x", "clk_ddrphy_src", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(7), 1, GFLAGS),
+-	GATE(0, "ddrc", "ddrphy_pre", CLK_IGNORE_UNUSED,
++	FACTOR_GATE(0, "ddrc", "clk_ddrphy_src", CLK_IGNORE_UNUSED, 1, 4,
+ 			RK2928_CLKGATE_CON(8), 5, GFLAGS),
+-	FACTOR_GATE(0, "ddrphy", "ddrphy4x", CLK_IGNORE_UNUSED, 1, 4,
++	FACTOR_GATE(0, "ddrphy", "clk_ddrphy_src", CLK_IGNORE_UNUSED, 1, 4,
+ 			RK2928_CLKGATE_CON(7), 0, GFLAGS),
+ 
+ 	/* PD_CORE */
+-	GATE(0, "dpll_core", "dpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(0), 6, GFLAGS),
+ 	GATE(0, "apll_core", "apll", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(0), 6, GFLAGS),
+ 	GATE(0, "gpll_core", "gpll", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(0), 6, GFLAGS),
++	GATE(0, "dpll_core", "dpll", CLK_IGNORE_UNUSED,
++			RK2928_CLKGATE_CON(0), 6, GFLAGS),
+ 	COMPOSITE_NOMUX(0, "pclk_dbg", "armclk", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKSEL_CON(1), 0, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
+ 			RK2928_CLKGATE_CON(4), 1, GFLAGS),
+@@ -257,14 +251,9 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_MISC_CON, 15, 1, MFLAGS),
+ 
+ 	/* PD_BUS */
+-	GATE(0, "hdmiphy_aclk_cpu", "hdmiphy", CLK_IGNORE_UNUSED,
++	COMPOSITE(0, "aclk_cpu_src", mux_pll_src_3plls_p, 0,
++			RK2928_CLKSEL_CON(0), 13, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK2928_CLKGATE_CON(0), 1, GFLAGS),
+-	GATE(0, "gpll_aclk_cpu", "gpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(0), 1, GFLAGS),
+-	GATE(0, "cpll_aclk_cpu", "cpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(0), 1, GFLAGS),
+-	COMPOSITE_NOGATE(0, "aclk_cpu_src", mux_aclk_cpu_src_p, 0,
+-			RK2928_CLKSEL_CON(0), 13, 2, MFLAGS, 8, 5, DFLAGS),
+ 	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src", 0,
+ 			RK2928_CLKGATE_CON(6), 0, GFLAGS),
+ 	COMPOSITE_NOMUX(HCLK_CPU, "hclk_cpu", "aclk_cpu_src", 0,
+@@ -337,14 +326,9 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKGATE_CON(3), 8, GFLAGS),
+ 
+ 	/* PD_PERI */
+-	GATE(0, "cpll_peri", "cpll", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(2), 0, GFLAGS),
+-	GATE(0, "gpll_peri", "gpll", CLK_IGNORE_UNUSED,
++	COMPOSITE(0, "aclk_peri_src", mux_pll_src_3plls_p, 0,
++			RK2928_CLKSEL_CON(10), 10, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK2928_CLKGATE_CON(2), 0, GFLAGS),
+-	GATE(0, "hdmiphy_peri", "hdmiphy", CLK_IGNORE_UNUSED,
+-			RK2928_CLKGATE_CON(2), 0, GFLAGS),
+-	COMPOSITE_NOGATE(0, "aclk_peri_src", mux_aclk_peri_src_p, 0,
+-			RK2928_CLKSEL_CON(10), 10, 2, MFLAGS, 0, 5, DFLAGS),
+ 	COMPOSITE_NOMUX(PCLK_PERI, "pclk_peri", "aclk_peri_src", 0,
+ 			RK2928_CLKSEL_CON(10), 12, 3, DFLAGS,
+ 			RK2928_CLKGATE_CON(5), 2, GFLAGS),
+@@ -402,12 +386,9 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 	 * Clock-Architecture Diagram 2
+ 	 */
+ 
+-	GATE(0, "gpll_vop", "gpll", 0,
+-			RK2928_CLKGATE_CON(3), 1, GFLAGS),
+-	GATE(0, "cpll_vop", "cpll", 0,
++	COMPOSITE_NODIV(0, "sclk_vop_src", mux_sclk_vop_src_p, 0,
++			RK2928_CLKSEL_CON(27), 0, 1, MFLAGS,
+ 			RK2928_CLKGATE_CON(3), 1, GFLAGS),
+-	MUX(0, "sclk_vop_src", mux_sclk_vop_src_p, 0,
+-			RK2928_CLKSEL_CON(27), 0, 1, MFLAGS),
+ 	DIV(DCLK_HDMI_PHY, "dclk_hdmiphy", "sclk_vop_src", 0,
+ 			RK2928_CLKSEL_CON(29), 0, 3, DFLAGS),
+ 	DIV(0, "sclk_vop_pre", "sclk_vop_src", 0,
+
+From d575c876e7f19e1699471d88edfe8d1874f6dd21 Mon Sep 17 00:00:00 2001
+From: Finley Xiao <finley.xiao@rock-chips.com>
+Date: Sun, 18 Mar 2018 21:41:43 +0800
+Subject: [PATCH] clk: rockchip: rk3228: Fix sclk_wifi div_width
+
+Change-Id: I8e216249fbd588ce55660eba9911fc59aedc920d
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index 6da33172c6ba..d59e619425b6 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -363,7 +363,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKGATE_CON(10), 12, GFLAGS),
+ 
+ 	COMPOSITE(SCLK_WIFI, "sclk_wifi", mux_pll_src_cpll_gpll_usb480m_p, 0,
+-			RK2928_CLKSEL_CON(23), 5, 2, MFLAGS, 0, 6, DFLAGS,
++			RK2928_CLKSEL_CON(23), 5, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK2928_CLKGATE_CON(2), 15, GFLAGS),
+ 
+ 	COMPOSITE(SCLK_SDMMC, "sclk_sdmmc", mux_mmc_src_p, 0,
+
+From 13db1588f0807f2d0569a45b93d6597280e105f6 Mon Sep 17 00:00:00 2001
+From: Chen Lei <lei.chen@rock-chips.com>
+Date: Tue, 25 Dec 2018 18:29:04 +0800
+Subject: [PATCH] clk: rockchip: rk322x: fix wrong mmc phase shift for rk3228
+
+mmc sample shift should be 1 for rk3228, or it will fail
+if we enable mmc tuning for rk3228.
+
+Change-Id: I301c2a7d33de8d519d7c288aef03a82531016373
+Signed-off-by: Chen Lei <lei.chen@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index d59e619425b6..9c5ad7c71143 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -620,13 +620,13 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 
+ 	/* PD_MMC */
+ 	MMC(SCLK_SDMMC_DRV,    "sdmmc_drv",    "sclk_sdmmc", RK3228_SDMMC_CON0, 1),
+-	MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc", RK3228_SDMMC_CON1, 0),
++	MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc", RK3228_SDMMC_CON1, 1),
+ 
+ 	MMC(SCLK_SDIO_DRV,     "sdio_drv",     "sclk_sdio",  RK3228_SDIO_CON0,  1),
+-	MMC(SCLK_SDIO_SAMPLE,  "sdio_sample",  "sclk_sdio",  RK3228_SDIO_CON1,  0),
++	MMC(SCLK_SDIO_SAMPLE,  "sdio_sample",  "sclk_sdio",  RK3228_SDIO_CON1,  1),
+ 
+ 	MMC(SCLK_EMMC_DRV,     "emmc_drv",     "sclk_emmc",  RK3228_EMMC_CON0,  1),
+-	MMC(SCLK_EMMC_SAMPLE,  "emmc_sample",  "sclk_emmc",  RK3228_EMMC_CON1,  0),
++	MMC(SCLK_EMMC_SAMPLE,  "emmc_sample",  "sclk_emmc",  RK3228_EMMC_CON1,  1),
+ };
+ 
+ static const char *const rk3228_critical_clocks[] __initconst = {
+
+From 8b9b8802556c4f7ce09699a4a85e19143de43c44 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Mon, 14 Dec 2020 21:05:15 +0100
+Subject: [PATCH] clk: rockchip: add *_vio_h2p to RK3228's critical clocks
+
+These are required in order to read the HDMI edid and must not
+get disabled in order to successfully do so.
+
+Signed-off-by: Alex Bee <knaerzche@gmail.com>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index 9c5ad7c71143..4b2aca6b1f11 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -641,6 +641,7 @@ static const char *const rk3228_critical_clocks[] __initconst = {
+ 	"aclk_vop_noc",
+ 	"aclk_hdcp_noc",
+ 	"hclk_vio_ahb_arbi",
++	"hclk_vio_h2p",
+ 	"hclk_vio_noc",
+ 	"hclk_vop_noc",
+ 	"hclk_host0_arb",
+@@ -658,6 +659,7 @@ static const char *const rk3228_critical_clocks[] __initconst = {
+ 	"pclk_ddrphy",
+ 	"pclk_acodecphy",
+ 	"pclk_phy_noc",
++	"pclk_vio_h2p",
+ 	"aclk_vpu_noc",
+ 	"aclk_rkvdec_noc",
+ 	"hclk_vpu_noc",
+
+From 3fc147d54b06e6451775465e35de17a6126377c2 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 17:07:35 +0200
+Subject: [PATCH] clk: rockchip add aclk_rkvdec and hclk_rkvdec to RK3228
+ critical clocks
+
+To be prevented from being disabled at any time add aclk_rkvdec and hclk_rkvdec
+to RK3228 critical clocks
+---
+ drivers/clk/rockchip/clk-rk3228.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index 4b2aca6b1f11..2ac006e99c03 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -662,8 +662,10 @@ static const char *const rk3228_critical_clocks[] __initconst = {
+ 	"pclk_vio_h2p",
+ 	"aclk_vpu_noc",
+ 	"aclk_rkvdec_noc",
++	"aclk_rkvdec",
+ 	"hclk_vpu_noc",
+ 	"hclk_rkvdec_noc",
++	"hclk_rkvdec",
+ };
+ 
+ static void __init rk3228_clk_init(struct device_node *np)
+
+From 8384abedb84b4f9c8648a92108de94b4b8d188a6 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Fri, 24 Apr 2020 11:42:58 +0200
+Subject: [PATCH] soc: rockchip: Support powerdomains which don't need /
+ support to be switched on / off
+
+Taken from https://github.com/rockchip-linux/kernel/commit/5be2cb19cf8e678655b59ec70c6a5f66f08d9418
+---
+ drivers/genpd/rockchip/pm-domains.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/drivers/genpd/rockchip/pm-domains.c b/drivers/genpd/rockchip/pm-domains.c
+index 54eb6cfc5d5b..c6b33f7c43df 100644
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -71,6 +71,7 @@ struct rockchip_pm_domain {
+ 	struct regmap **qos_regmap;
+ 	u32 *qos_save_regs[MAX_QOS_REGS_NUM];
+ 	int num_clks;
++	bool is_ignore_pwr;
+ 	struct clk_bulk_data *clks;
+ };
+ 
+@@ -330,6 +331,9 @@ static int rockchip_pd_power_on(struct generic_pm_domain *domain)
+ {
+ 	struct rockchip_pm_domain *pd = to_rockchip_pd(domain);
+ 
++	if (pd->is_ignore_pwr)
++		return 0;
++
+ 	return rockchip_pd_power(pd, true);
+ }
+ 
+@@ -337,6 +341,9 @@ static int rockchip_pd_power_off(struct generic_pm_domain *domain)
+ {
+ 	struct rockchip_pm_domain *pd = to_rockchip_pd(domain);
+ 
++	if (pd->is_ignore_pwr)
++		return 0;
++
+ 	return rockchip_pd_power(pd, false);
+ }
+ 
+@@ -416,6 +423,9 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
+ 	pd->info = pd_info;
+ 	pd->pmu = pmu;
+ 
++	if (!pd_info->pwr_mask)
++		pd->is_ignore_pwr = true;
++
+ 	pd->num_clks = of_clk_get_parent_count(node);
+ 	if (pd->num_clks > 0) {
+ 		pd->clks = devm_kcalloc(pmu->dev, pd->num_clks,
+@@ -566,6 +576,7 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+ {
+ 	struct device_node *np;
+ 	struct generic_pm_domain *child_domain, *parent_domain;
++	struct rockchip_pm_domain *child_pd, *parent_pd;
+ 	int error;
+ 
+ 	for_each_child_of_node(parent, np) {
+@@ -606,6 +617,18 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
+ 				parent_domain->name, child_domain->name);
+ 		}
+ 
++		/*
++		 * If child_pd doesn't do idle request or power on/off,
++		 * parent_pd may fail to do power on/off, so if parent_pd
++		 * need to power on/off, child_pd can't ignore to do idle
++		 * request and power on/off.
++		 */
++		child_pd = to_rockchip_pd(child_domain);
++		parent_pd = to_rockchip_pd(parent_domain);
++		if (!parent_pd->is_ignore_pwr)
++			child_pd->is_ignore_pwr = false;
++
++
+ 		rockchip_pm_add_subdomain(pmu, np);
+ 	}
+ 
+
+From 14c607b588c49705ac0486d63590876089b41a20 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Fri, 24 Apr 2020 09:08:44 +0200
+Subject: [PATCH] phy: rockchip: hdmi: readout hdmi phy flag for RK3228 HDMI
+ phys
+
+Some RK3228 HDMI phys only get a stable pll on frequencies higher 33,75 MHz.
+This is defined in a flag in efuse of those devices.
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi                 |  6 +++
+ drivers/phy/rockchip/phy-rockchip-inno-hdmi.c | 38 ++++++++++++++++++-
+ 2 files changed, 42 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index 48e6e8d44a1a..a5f1d1a004d4 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -317,6 +317,10 @@ efuse_id: id@7 {
+ 		cpu_leakage: cpu_leakage@17 {
+ 			reg = <0x17 0x1>;
+ 		};
++		hdmi_phy_flag: hdmi-phy-flag@1d {
++			reg = <0x1d 0x1>;
++			bits = <1 1>;
++		};
+ 	};
+ 
+ 	i2c0: i2c@11050000 {
+@@ -536,6 +540,8 @@ hdmi_phy: hdmi-phy@12030000 {
+ 		clock-names = "sysclk", "refoclk", "refpclk";
+ 		#clock-cells = <0>;
+ 		clock-output-names = "hdmiphy_phy";
++		nvmem-cells = <&hdmi_phy_flag>;
++		nvmem-cell-names = "hdmi-phy-flag";
+ 		#phy-cells = <0>;
+ 		status = "disabled";
+ 	};
+diff --git a/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+index bb8bdf5e3301..0c7a97352714 100644
+--- a/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+@@ -237,6 +237,9 @@ struct inno_hdmi_phy {
+ 	struct clk *refoclk;
+ 	struct clk *refpclk;
+ 
++	/* phy_flag flag */
++	bool phy_flag;
++
+ 	/* platform data */
+ 	const struct inno_hdmi_phy_drv_data *plat_data;
+ 	int chip_version;
+@@ -347,6 +350,7 @@ static const struct pre_pll_config pre_pll_cfg_table[] = {
+ static const struct post_pll_config post_pll_cfg_table[] = {
+ 	{33750000,  1, 40, 8, 1},
+ 	{33750000,  1, 80, 8, 2},
++	{33750000,  1, 10, 2, 4},
+ 	{74250000,  1, 40, 8, 1},
+ 	{74250000, 18, 80, 8, 2},
+ 	{148500000, 2, 40, 4, 3},
+@@ -497,8 +501,11 @@ static int inno_hdmi_phy_power_on(struct phy *phy)
+ 		return -EINVAL;
+ 
+ 	for (; cfg->tmdsclock != 0; cfg++)
+-		if (tmdsclock <= cfg->tmdsclock &&
+-		    cfg->version & inno->chip_version)
++		if (((!inno->phy_flag || tmdsclock > 33750000)
++		     && tmdsclock <= cfg->tmdsclock
++		     && cfg->version & inno->chip_version) ||
++		    (inno->phy_flag && tmdsclock <= 33750000
++		     && cfg->version & 4))
+ 			break;
+ 
+ 	for (; phy_cfg->tmdsclock != 0; phy_cfg++)
+@@ -909,6 +916,10 @@ static int inno_hdmi_phy_clk_register(struct inno_hdmi_phy *inno)
+ 
+ static int inno_hdmi_phy_rk3228_init(struct inno_hdmi_phy *inno)
+ {
++	struct nvmem_cell *cell;
++	unsigned char *efuse_buf;
++	size_t len;
++
+ 	/*
+ 	 * Use phy internal register control
+ 	 * rxsense/poweron/pllpd/pdataen signal.
+@@ -923,7 +934,28 @@ static int inno_hdmi_phy_rk3228_init(struct inno_hdmi_phy *inno)
+ 	inno_update_bits(inno, 0xaa, RK3228_POST_PLL_CTRL_MANUAL,
+ 			 RK3228_POST_PLL_CTRL_MANUAL);
+ 
++
+ 	inno->chip_version = 1;
++	inno->phy_flag = false;
++
++	cell = nvmem_cell_get(inno->dev, "hdmi-phy-flag");
++	if (IS_ERR(cell)) {
++		if (PTR_ERR(cell) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++
++		return 0;
++	}
++
++	efuse_buf = nvmem_cell_read(cell, &len);
++	nvmem_cell_put(cell);
++
++	if (IS_ERR(efuse_buf))
++		return 0;
++	if (len == 1)
++		inno->phy_flag = (efuse_buf[0] & BIT(1)) ? true : false;
++	kfree(efuse_buf);
++
++	dev_info(inno->dev, "phy_flag is: %d\n", inno->phy_flag);
+ 
+ 	return 0;
+ }
+@@ -1023,6 +1055,8 @@ static int inno_hdmi_phy_rk3328_init(struct inno_hdmi_phy *inno)
+ 
+ 	/* try to read the chip-version */
+ 	inno->chip_version = 1;
++	inno->phy_flag = false;
++
+ 	cell = nvmem_cell_get(inno->dev, "cpu-version");
+ 	if (IS_ERR(cell)) {
+ 		if (PTR_ERR(cell) == -EPROBE_DEFER)
+
+From 01d16d33ee32f2e2de85cbc8a0a399527c2121ad Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Tue, 26 May 2020 14:41:39 +0200
+Subject: [PATCH] usb: dwc2: QUIRKS: rockchip host only controller needs longer
+ msleep to initialize
+
+---
+ drivers/usb/dwc2/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
+index fec17a2d2447..eb55c64f63be 100644
+--- a/drivers/usb/dwc2/core.c
++++ b/drivers/usb/dwc2/core.c
+@@ -663,7 +663,7 @@ void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
+ 		 * platforms on their host-only dwc2.
+ 		 */
+ 		if (!dwc2_hw_is_otg(hsotg))
+-			msleep(50);
++			msleep(200);
+ 
+ 		break;
+ 	case USB_DR_MODE_PERIPHERAL:
+
+From 713a88dec72631a71bf736e120236f60d06f3989 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 18:51:38 +0200
+Subject: [PATCH] ARM: dts: rockchip add operating-points, power-domain for
+ RK322Xs GPU
+
+This adds the operating-points table and the power-domain and the respective
+qos registers for RK322xs GPU.
+While at this it also adds the GPU to be a cooling cell.
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index a5f1d1a004d4..dedf84af9e51 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -510,6 +510,11 @@ map1 {
+ 						<&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+ 						<&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 				};
++				map2 {
++					trip = <&cpu_alert1>;
++					cooling-device =
++						<&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -564,7 +569,28 @@ gpu: gpu@20000000 {
+ 		clocks = <&cru ACLK_GPU>, <&cru ACLK_GPU>;
+ 		clock-names = "bus", "core";
+ 		resets = <&cru SRST_GPU_A>;
+-		status = "disabled";
++		operating-points-v2 = <&gpu_opp_table>;
++		#cooling-cells = <2>; /* min followed by max */
++	};
++
++	gpu_opp_table: opp-table2 {
++		compatible = "operating-points-v2";
++
++		opp-216000000 {
++			opp-hz = /bits/ 64 <216000000>;
++			opp-microvolt = <1100000 1100000 1150000>;
++		};
++
++		opp-408000000 {
++			opp-hz = /bits/ 64 <408000000>;
++			opp-microvolt = <1100000 1100000 1150000>;
++		};
++
++		opp-504000000 {
++			opp-hz = /bits/ 64 <504000000>;
++			opp-microvolt = <1100000 1100000 1150000>; 
++			status="disabled";
++		};
+ 	};
+ 
+ 	vpu_mmu: iommu@20020800 {
+
+From 4526da0caf4ecc56cc6e6b8602715dbe839c3eac Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 19:44:42 +0200
+Subject: [PATCH] ARM: dts: rockchip: add ethernet0 alias
+
+Add ethernet0 alias for gmac. This will, for example, be used
+by u-boot to inject a "local-mac-address" in the devicetree.
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index dedf84af9e51..3c20ee3a7837 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -14,6 +14,7 @@ / {
+ 	interrupt-parent = <&gic>;
+ 
+ 	aliases {
++		ethernet0 = &gmac;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+
+From 3d6864134434144078395786338b194704a5a41a Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 20:00:01 +0200
+Subject: [PATCH] ARM: dts: rockchip: add hdmi simple-audio-card for RK322x
+
+Add "simple-audio-card" definition for hdmi-sound. While at
+that also add the missing #sound-dai-cells for i2s, spdif and hdmi
+nodes.
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index 3c20ee3a7837..d10ca04c20d6 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -123,6 +123,22 @@ arm-pmu {
+ 		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
+ 	};
+ 
++	hdmi_sound: hdmi-sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "HDMI";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,mclk-fs = <256>;
++		status = "disabled";
++
++		simple-audio-card,cpu {
++			sound-dai = <&i2s0>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&hdmi>;
++		};
++	};
++
+ 	psci {
+ 		compatible = "arm,psci-1.0", "arm,psci-0.2";
+ 		method = "smc";
+@@ -160,6 +176,7 @@ i2s1: i2s1@100b0000 {
+ 		dma-names = "tx", "rx";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2s1_bus>;
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -171,6 +188,7 @@ i2s0: i2s0@100c0000 {
+ 		clocks = <&cru SCLK_I2S0>, <&cru HCLK_I2S0_8CH>;
+ 		dmas = <&pdma 11>, <&pdma 12>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -184,6 +202,7 @@ spdif: spdif@100d0000 {
+ 		dma-names = "tx";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spdif_tx>;
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -685,6 +704,7 @@ hdmi: hdmi@200a0000 {
+ 		phys = <&hdmi_phy>;
+ 		phy-names = "hdmi";
+ 		rockchip,grf = <&grf>;
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
+ 
+ 		ports {
+
+From f917eada6b9f431a797e3bfab7cd06dbd9dfe981 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 21:16:11 +0200
+Subject: [PATCH] ARM: dts: rockchip: add uart1-1 pins for RK322x
+
+Add uart uart1-1 pins.
+While at this also correct the uart2 default pinctrl, which is uart21_xfer.
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index d10ca04c20d6..f675551391c3 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -316,7 +316,7 @@ uart2: serial@11030000 {
+ 		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
+ 		clock-names = "baudclk", "apb_pclk";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&uart2_xfer>;
++		pinctrl-0 = <&uart21_xfer>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+ 		status = "disabled";
+@@ -1194,13 +1194,30 @@ uart1_xfer: uart1-xfer {
+ 						<1 RK_PB2 1 &pcfg_pull_none>;
+ 			};
+ 
++			uart11_xfer: uart11-xfer {
++				rockchip,pins = <3 RK_PB6 1 &pcfg_pull_up>,
++						<3 RK_PB5 1 &pcfg_pull_none>;
++			};
++
+ 			uart1_cts: uart1-cts {
+ 				rockchip,pins = <1 RK_PB0 1 &pcfg_pull_none>;
+ 			};
+ 
++			uart11_cts: uart11-cts {
++				rockchip,pins = <3 RK_PA7 1 &pcfg_pull_none>;
++			};
++
+ 			uart1_rts: uart1-rts {
+ 				rockchip,pins = <1 RK_PB3 1 &pcfg_pull_none>;
+ 			};
++
++			uart11_rts: uart11-rts {
++				rockchip,pins = <3 RK_PA6 1 &pcfg_pull_none>;
++			};
++
++			uart11_rts_gpio: uart11-rts-gpio {
++				rockchip,pins = <3 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
+ 		};
+ 
+ 		uart2 {
+
+From cbbb85e00a2b19c1e3e9e4d6591c481718e5fb42 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 21:58:56 +0200
+Subject: [PATCH] ARM: dts: rockchip: align mmc* node properties with driver
+
+Add resets, max-frequency and bus-width properties where required to emmc
+,sdmmc and sdio nodes. While at that also add the sdmmc_pwr pinctrl which
+is required to get the sd-card controller to work, if it was not/wrong
+initialized by the bootloader (i.e. u-boot)
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index f675551391c3..8e7a866e39e5 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -726,9 +726,13 @@ sdmmc: mmc@30000000 {
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
+ 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
++		bus-width = <4>;
+ 		fifo-depth = <0x100>;
++		max-frequency = <150000000>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_bus4>;
++		pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_bus4 &sdmmc_pwr>;
++		resets = <&cru SRST_SDMMC>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -738,10 +742,14 @@ sdio: mmc@30010000 {
+ 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
+ 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
++		bus-width = <4>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
++		max-frequency = <150000000>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&sdio_clk &sdio_cmd &sdio_bus4>;
++		resets = <&cru SRST_SDIO>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -749,14 +757,13 @@ emmc: mmc@30020000 {
+ 		compatible = "rockchip,rk3228-dw-mshc", "rockchip,rk3288-dw-mshc";
+ 		reg = <0x30020000 0x4000>;
+ 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+-		clock-frequency = <37500000>;
+-		max-frequency = <37500000>;
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
+ 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		bus-width = <8>;
+ 		rockchip,default-sample-phase = <158>;
+ 		fifo-depth = <0x100>;
++		max-frequency = <150000000>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
+ 		resets = <&cru SRST_EMMC>;
+@@ -962,6 +969,10 @@ sdmmc_bus4: sdmmc-bus4 {
+ 						<1 RK_PC4 1 &pcfg_pull_none_drv_12ma>,
+ 						<1 RK_PC5 1 &pcfg_pull_none_drv_12ma>;
+ 			};
++
++			sdmmc_pwr: sdmmc-pwr {
++				rockchip,pins = <1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
+ 		};
+ 
+ 		sdio {
+
+From 86ae340dabdfbc27ebdb1b43b96d59999dfa4f5a Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 23:12:25 +0200
+Subject: [PATCH] ARM: dts: rk322x: add crypto node
+
+In order to add support for RK322x's crypto HW, the node
+has been added t its dts.
+
+Signed-off-by: Alex Bee <knaerzche@gmail.com>
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index 8e7a866e39e5..217ee6568f9e 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -166,6 +166,17 @@ display_subsystem: display-subsystem {
+ 		ports = <&vop_out>;
+ 	};
+ 
++	crypto: cypto-controller@100a0000 {
++		compatible = "rockchip,rk3288-crypto";
++		reg = <0x100a0000 0x4000>;
++		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_M_CRYPTO>, <&cru HCLK_S_CRYPTO>,
++		<&cru SCLK_CRYPTO>, <&cru ACLK_DMAC>;
++		clock-names = "aclk", "hclk", "sclk", "apb_pclk";
++		resets = <&cru SRST_CRYPTO>;
++		reset-names = "crypto-rst";
++	};
++
+ 	i2s1: i2s1@100b0000 {
+ 		compatible = "rockchip,rk3228-i2s", "rockchip,rk3066-i2s";
+ 		reg = <0x100b0000 0x4000>;

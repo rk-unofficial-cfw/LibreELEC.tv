@@ -273,6 +273,12 @@ devices = \
     },
   },
   'Rockchip': {
+      'RK322X': {
+      'rk322x': {
+        'dtb': 'rk322x-box.dtb',
+        'config': 'rk322x-box_defconfig'
+      },
+    },
     'RK3288': {
       'miqi': {
         'dtb': 'rk3288-miqi.dtb',

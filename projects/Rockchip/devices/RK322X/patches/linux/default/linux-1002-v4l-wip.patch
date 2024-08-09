@@ -1,0 +1,37 @@
+From e9d4e43dc5a6fbcdff3be92e4ec40c7bb787a897 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 11 Oct 2020 14:48:44 +0200
+Subject: [PATCH] ARM: dts: rockchip: Add IEP node for RK322x
+
+Signed-off-by: Alex Bee <knaerzche@gmail.com>
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index de5727e0bc94..a2012a44421d 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -781,6 +781,21 @@ rga: rga@20060000 {
+ 		power-domains = <&power RK3228_PD_VIO>;
+ 	};
+ 
++	iep: iep@20070000 {
++		compatible = "rockchip,rk3228-iep";
++		reg = <0x20070000 0x800>;
++		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "iep";
++		clocks = <&cru ACLK_IEP>,
++		         <&cru HCLK_IEP>;
++		clock-names = "axi", "ahb";
++		resets = <&cru SRST_IEP_A>,
++		         <&cru SRST_IEP_H>;
++		reset-names = "axi", "ahb";
++		power-domains = <&power RK3228_PD_VIO>;
++		iommus = <&iep_mmu>;
++	};
++
+ 	iep_mmu: iommu@20070800 {
+ 		compatible = "rockchip,iommu";
+ 		reg = <0x20070800 0x100>;
+

@@ -1,0 +1,69 @@
+From 9be348c6cade7e709be7347d336c7638bf603b46 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sat, 15 Aug 2020 23:38:05 +0200
+Subject: [PATCH] rockchip/drm: add dsp_data_swap register for RK3188
+
+---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 27a04c5bc2fd..b47f036d4a2c 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -555,6 +555,7 @@ static const struct vop_common rk3188_common = {
+ 	.dither_up = VOP_REG(RK3188_DSP_CTRL0, 0x1, 9),
+ 	.dsp_lut_en = VOP_REG(RK3188_SYS_CTRL, 0x1, 28),
+ 	.data_blank = VOP_REG(RK3188_DSP_CTRL1, 0x1, 25),
++	.dsp_data_swap = VOP_REG(RK3188_DSP_CTRL1, 0x1f, 26),
+ };
+ 
+ static const struct vop_win_data rk3188_vop_win_data[] = {
+
+From 195b202dbc5abe9c65e029826a7f3e2a2d71067a Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Wed, 22 Jul 2020 20:22:02 +0200
+Subject: [PATCH] rockchip/drm: add dsp_data_swap register for RK3066
+
+Signed-off-by: Alex Bee <knaerzche@gmail.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index b47f036d4a2c..ae4a27704ad6 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -448,6 +448,7 @@ static const struct vop_common rk3066_common = {
+ 	.dither_up = VOP_REG(RK3066_DSP_CTRL0, 0x1, 9),
+ 	.dsp_lut_en = VOP_REG(RK3066_SYS_CTRL1, 0x1, 31),
+ 	.data_blank = VOP_REG(RK3066_DSP_CTRL1, 0x1, 25),
++	.dsp_data_swap = VOP_REG(RK3066_DSP_CTRL1, 0x1f, 26),
+ };
+ 
+ static const struct vop_win_data rk3066_vop_win_data[] = {
+
+From a8d962000848a237f8e8f0de8395d4e7df2a7197 Mon Sep 17 00:00:00 2001
+From: Alex Bee <knaerzche@gmail.com>
+Date: Sun, 16 Aug 2020 23:40:24 +0200
+Subject: [PATCH] WIP: ARM: dts: rockchip add vpll clock to RK322Xs hdmi node
+
+---
+ arch/arm/boot/dts/rockchip/rk322x.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rockchip/rk322x.dtsi b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+index 4bc631881c05..f98a945c68d3 100644
+--- a/arch/arm/boot/dts/rockchip/rk322x.dtsi
++++ b/arch/arm/boot/dts/rockchip/rk322x.dtsi
+@@ -766,8 +766,8 @@ hdmi: hdmi@200a0000 {
+ 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 		assigned-clocks = <&cru SCLK_HDMI_PHY>;
+ 		assigned-clock-parents = <&hdmi_phy>;
+-		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_HDCP>, <&cru SCLK_HDMI_CEC>;
+-		clock-names = "iahb", "isfr", "cec";
++		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_HDCP>, <&hdmi_phy>, <&cru SCLK_HDMI_CEC>;
++		clock-names = "iahb", "isfr", "vpll", "cec";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&hdmii2c_xfer &hdmi_hpd &hdmi_cec>;
+ 		resets = <&cru SRST_HDMI_P>;

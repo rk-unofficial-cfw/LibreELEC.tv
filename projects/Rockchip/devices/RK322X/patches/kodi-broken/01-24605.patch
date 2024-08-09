@@ -1,0 +1,817 @@
+From a7283ef2b5e02b29c2fbe7f4d286fb4f8e9a18fc Mon Sep 17 00:00:00 2001
+From: sarbes <sarbes@kodi.tv>
+Date: Wed, 10 Apr 2024 10:26:27 +0200
+Subject: [PATCH] GL: improve text rendering
+
+---
+ .../shaders/GL/1.2/gl_shader_vert_clip.glsl   |  39 ++++++
+ .../shaders/GL/1.2/gl_shader_vert_simple.glsl |  26 ++++
+ .../shaders/GL/1.5/gl_shader_vert_clip.glsl   |  39 ++++++
+ .../shaders/GL/1.5/gl_shader_vert_simple.glsl |  26 ++++
+ .../VideoRenderers/OverlayRendererGL.cpp      |   5 +
+ xbmc/guilib/GUIFont.cpp                       |  16 +--
+ xbmc/guilib/GUIFontTTF.cpp                    |  95 +++++++++++++-
+ xbmc/guilib/GUIFontTTF.h                      |  12 +-
+ xbmc/guilib/GUIFontTTFGL.cpp                  | 118 ++++++++++--------
+ xbmc/guilib/GUIFontTTFGL.h                    |   4 +-
+ xbmc/rendering/gl/GLShader.cpp                |   6 +-
+ xbmc/rendering/gl/GLShader.h                  |   8 +-
+ xbmc/rendering/gl/RenderSystemGL.cpp          |  47 ++++++-
+ xbmc/rendering/gl/RenderSystemGL.h            |   7 +-
+ 14 files changed, 376 insertions(+), 72 deletions(-)
+ create mode 100644 system/shaders/GL/1.2/gl_shader_vert_clip.glsl
+ create mode 100644 system/shaders/GL/1.2/gl_shader_vert_simple.glsl
+ create mode 100644 system/shaders/GL/1.5/gl_shader_vert_clip.glsl
+ create mode 100644 system/shaders/GL/1.5/gl_shader_vert_simple.glsl
+
+diff --git a/system/shaders/GL/1.2/gl_shader_vert_clip.glsl b/system/shaders/GL/1.2/gl_shader_vert_clip.glsl
+new file mode 100644
+index 0000000000000..37d67946f5949
+--- /dev/null
++++ b/system/shaders/GL/1.2/gl_shader_vert_clip.glsl
+@@ -0,0 +1,39 @@
++/*
++ *  Copyright (C) 2024 Team Kodi
++ *  This file is part of Kodi - https://kodi.tv
++ *
++ *  SPDX-License-Identifier: GPL-2.0-or-later
++ *  See LICENSES/README.md for more information.
++ */
++
++#version 120
++
++attribute vec4 m_attrpos;
++attribute vec4 m_attrcol;
++attribute vec4 m_attrcord0;
++attribute vec4 m_attrcord1;
++varying vec4 m_cord0;
++varying vec4 m_cord1;
++varying vec4 m_colour;
++uniform mat4 m_matrix;
++uniform vec4 m_shaderClip;
++uniform vec4 m_cordStep;
++
++// this shader can be used in cases where clipping via glScissor() is not
++// possible (e.g. when rotating). it can't discard triangles, but it may 
++// degenerate them.
++
++void main ()
++{
++  // limit the vertices to the clipping area
++  vec4 position = m_attrpos;
++  position.xy = clamp(position.xy, m_shaderClip.xy, m_shaderClip.zw);
++  gl_Position = m_matrix * position;
++
++  // correct texture coordinates for clipped vertices
++  vec2 clipDist = m_attrpos.xy - position.xy;
++  m_cord0.xy = m_attrcord0.xy - clipDist * m_cordStep.xy;
++  m_cord1.xy = m_attrcord1.xy - clipDist * m_cordStep.zw;
++
++  m_colour = m_attrcol;
++}
+diff --git a/system/shaders/GL/1.2/gl_shader_vert_simple.glsl b/system/shaders/GL/1.2/gl_shader_vert_simple.glsl
+new file mode 100644
+index 0000000000000..f06893a0850ed
+--- /dev/null
++++ b/system/shaders/GL/1.2/gl_shader_vert_simple.glsl
+@@ -0,0 +1,26 @@
++/*
++ *  Copyright (C) 2024 Team Kodi
++ *  This file is part of Kodi - https://kodi.tv
++ *
++ *  SPDX-License-Identifier: GPL-2.0-or-later
++ *  See LICENSES/README.md for more information.
++ */
++
++#version 120
++
++attribute vec4 m_attrpos;
++attribute vec4 m_attrcol;
++attribute vec4 m_attrcord0;
++attribute vec4 m_attrcord1;
++varying vec4 m_cord0;
++varying vec4 m_cord1;
++varying vec4 m_colour;
++uniform mat4 m_matrix;
++
++void main ()
++{
++  gl_Position = m_matrix * m_attrpos;
++  m_colour    = m_attrcol;
++  m_cord0     = m_attrcord0;
++  m_cord1     = m_attrcord1;
++}
+diff --git a/system/shaders/GL/1.5/gl_shader_vert_clip.glsl b/system/shaders/GL/1.5/gl_shader_vert_clip.glsl
+new file mode 100644
+index 0000000000000..2fa1c63da13d7
+--- /dev/null
++++ b/system/shaders/GL/1.5/gl_shader_vert_clip.glsl
+@@ -0,0 +1,39 @@
++/*
++ *  Copyright (C) 2024 Team Kodi
++ *  This file is part of Kodi - https://kodi.tv
++ *
++ *  SPDX-License-Identifier: GPL-2.0-or-later
++ *  See LICENSES/README.md for more information.
++ */
++
++#version 150
++
++in vec4 m_attrpos;
++in vec4 m_attrcol;
++in vec4 m_attrcord0;
++in vec4 m_attrcord1;
++out vec4 m_cord0;
++out vec4 m_cord1;
++out vec4 m_colour;
++uniform mat4 m_matrix;
++uniform vec4 m_shaderClip;
++uniform vec4 m_cordStep;
++
++// this shader can be used in cases where clipping via glScissor() is not
++// possible (e.g. when rotating). it can't discard triangles, but it may 
++// degenerate them.
++
++void main ()
++{
++  // limit the vertices to the clipping area
++  vec4 position = m_attrpos;
++  position.xy = clamp(position.xy, m_shaderClip.xy, m_shaderClip.zw);
++  gl_Position = m_matrix * position;
++
++  // correct texture coordinates for clipped vertices
++  vec2 clipDist = m_attrpos.xy - position.xy;
++  m_cord0.xy = m_attrcord0.xy - clipDist * m_cordStep.xy;
++  m_cord1.xy = m_attrcord1.xy - clipDist * m_cordStep.zw;
++
++  m_colour = m_attrcol;
++}
+diff --git a/system/shaders/GL/1.5/gl_shader_vert_simple.glsl b/system/shaders/GL/1.5/gl_shader_vert_simple.glsl
+new file mode 100644
+index 0000000000000..9c1552d7a4af9
+--- /dev/null
++++ b/system/shaders/GL/1.5/gl_shader_vert_simple.glsl
+@@ -0,0 +1,26 @@
++/*
++ *  Copyright (C) 2024 Team Kodi
++ *  This file is part of Kodi - https://kodi.tv
++ *
++ *  SPDX-License-Identifier: GPL-2.0-or-later
++ *  See LICENSES/README.md for more information.
++ */
++
++#version 150
++
++in vec4 m_attrpos;
++in vec4 m_attrcol;
++in vec4 m_attrcord0;
++in vec4 m_attrcord1;
++out vec4 m_cord0;
++out vec4 m_cord1;
++out vec4 m_colour;
++uniform mat4 m_matrix;
++
++void main ()
++{
++  gl_Position = m_matrix * m_attrpos;
++  m_colour    = m_attrcol;
++  m_cord0     = m_attrcord0;
++  m_cord1     = m_attrcord1;
++}
+diff --git a/xbmc/cores/VideoPlayer/VideoRenderers/OverlayRendererGL.cpp b/xbmc/cores/VideoPlayer/VideoRenderers/OverlayRendererGL.cpp
+index 3caa28e4bf2a7..8559d22eae223 100644
+--- a/xbmc/cores/VideoPlayer/VideoRenderers/OverlayRendererGL.cpp
++++ b/xbmc/cores/VideoPlayer/VideoRenderers/OverlayRendererGL.cpp
+@@ -293,6 +293,11 @@ void COverlayGlyphGL::Render(SRenderState& state)
+   GLint posLoc  = renderSystem->ShaderGetPos();
+   GLint colLoc  = renderSystem->ShaderGetCol();
+   GLint tex0Loc = renderSystem->ShaderGetCoord0();
++  GLint matrixUniformLoc = renderSystem->ShaderGetMatrix();
++
++  CMatrixGL matrix = glMatrixProject.Get();
++  matrix.MultMatrixf(glMatrixModview.Get());
++  glUniformMatrix4fv(matrixUniformLoc, 1, GL_FALSE, matrix);
+ 
+   std::vector<VERTEX> vecVertices(6 * m_vertex.size() / 4);
+   VERTEX* vertices = vecVertices.data();
+diff --git a/xbmc/guilib/GUIFont.cpp b/xbmc/guilib/GUIFont.cpp
+index 784dd75971319..bf0c014a0aac4 100644
+--- a/xbmc/guilib/GUIFont.cpp
++++ b/xbmc/guilib/GUIFont.cpp
+@@ -234,18 +234,18 @@ void CGUIFont::DrawScrollingText(float x,
+       shadowColors.emplace_back((renderColor & 0xff000000) != 0 ? shadowColor : 0);
+     for (float dx = -offset; dx < maxWidth; dx += scrollInfo.m_totalWidth)
+     {
+-      m_font->DrawTextInternal(context, x + dx + 1, y + 1, shadowColors, text, alignment,
+-                               textPixelWidth, scroll);
+-      m_font->DrawTextInternal(context, x + dx + scrollInfo.m_textWidth + 1, y + 1, shadowColors,
+-                               scrollInfo.m_suffix, alignment, suffixPixelWidth, scroll);
++      m_font->DrawTextInternal(context, x + 1, y + 1, shadowColors, text, alignment, textPixelWidth,
++                               scroll, dx);
++      m_font->DrawTextInternal(context, x + scrollInfo.m_textWidth + 1, y + 1, shadowColors,
++                               scrollInfo.m_suffix, alignment, suffixPixelWidth, scroll, dx);
+     }
+   }
+   for (float dx = -offset; dx < maxWidth; dx += scrollInfo.m_totalWidth)
+   {
+-    m_font->DrawTextInternal(context, x + dx, y, renderColors, text, alignment, textPixelWidth,
+-                             scroll);
+-    m_font->DrawTextInternal(context, x + dx + scrollInfo.m_textWidth, y, renderColors,
+-                             scrollInfo.m_suffix, alignment, suffixPixelWidth, scroll);
++    m_font->DrawTextInternal(context, x, y, renderColors, text, alignment, textPixelWidth, scroll,
++                             dx);
++    m_font->DrawTextInternal(context, x + scrollInfo.m_textWidth, y, renderColors,
++                             scrollInfo.m_suffix, alignment, suffixPixelWidth, scroll, dx);
+   }
+ 
+   context.RestoreClipRegion();
+diff --git a/xbmc/guilib/GUIFontTTF.cpp b/xbmc/guilib/GUIFontTTF.cpp
+index 10041f7d61ec8..780f168a30065 100644
+--- a/xbmc/guilib/GUIFontTTF.cpp
++++ b/xbmc/guilib/GUIFontTTF.cpp
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -339,7 +339,9 @@ void CGUIFontTTF::DrawTextInternal(CGraphicContext& context,
+                                    const vecText& text,
+                                    uint32_t alignment,
+                                    float maxPixelWidth,
+-                                   bool scrolling)
++                                   bool scrolling,
++                                   float dx,
++                                   float dy)
+ {
+   if (text.empty())
+   {
+@@ -349,15 +351,40 @@ void CGUIFontTTF::DrawTextInternal(CGraphicContext& context,
+   Begin();
+   uint32_t rawAlignment = alignment;
+   bool dirtyCache(false);
++
++#if defined(HAS_GL)
++  // round coordinates to the pixel grid. otherwise, we might sample at the wrong positions.
++  if (!scrolling)
++    x = std::round(x);
++  y = std::round(y);
++#else
++  x += dx;
++  y += dy;
++#endif
++
++#if defined(HAS_GL)
++  // GL can scissor and shader clip
++  const bool hardwareClipping = true;
++#else
++  // FIXME: remove static (CPU based) clipping for GLES/DX
+   const bool hardwareClipping = m_renderSystem->ScissorsCanEffectClipping();
++#endif
++
++  // FIXME: remove positional stuff once GLES/DX are brought up to date
+   CGUIFontCacheStaticPosition staticPos(x, y);
+   CGUIFontCacheDynamicPosition dynamicPos;
++
++#if defined(HAS_GL)
++  // dummy positions for the time being
++  dynamicPos = CGUIFontCacheDynamicPosition(0.0f, 0.0f, 0.0f);
++#else
+   if (hardwareClipping)
+   {
+     dynamicPos =
+         CGUIFontCacheDynamicPosition(context.ScaleFinalXCoord(x, y), context.ScaleFinalYCoord(x, y),
+                                      context.ScaleFinalZCoord(x, y));
+   }
++#endif
+ 
+   CVertexBuffer unusedVertexBuffer;
+   CVertexBuffer& vertexBuffer =
+@@ -388,8 +415,14 @@ void CGUIFontTTF::DrawTextInternal(CGraphicContext& context,
+   {
+     const std::vector<Glyph> glyphs = GetHarfBuzzShapedGlyphs(text);
+     // save the origin, which is scaled separately
++#if defined(HAS_GL)
++    // the origin is now at [0,0], and not at "random" locations anymore. positioning is done in the vertex shader.
++    m_originX = 0;
++    m_originY = 0;
++#else
+     m_originX = x;
+     m_originY = y;
++#endif
+ 
+     // cache the ellipses width
+     if (!m_ellipseCached)
+@@ -623,7 +656,11 @@ void CGUIFontTTF::DrawTextInternal(CGraphicContext& context,
+                                 scrolling, std::chrono::steady_clock::now(), dirtyCache);
+       CVertexBuffer newVertexBuffer = CreateVertexBuffer(*tempVertices);
+       vertexBuffer = newVertexBuffer;
++#if defined(HAS_GL)
++      m_vertexTrans.emplace_back(x, y, 0.0f, &vertexBuffer, context.GetClipRegion(), dx, dy);
++#else
+       m_vertexTrans.emplace_back(.0f, .0f, .0f, &vertexBuffer, context.GetClipRegion());
++#endif
+     }
+     else
+     {
+@@ -637,8 +674,12 @@ void CGUIFontTTF::DrawTextInternal(CGraphicContext& context,
+   else
+   {
+     if (hardwareClipping)
++#if defined(HAS_GL)
++      m_vertexTrans.emplace_back(x, y, 0.0f, &vertexBuffer, context.GetClipRegion(), dx, dy);
++#else
+       m_vertexTrans.emplace_back(dynamicPos.m_x, dynamicPos.m_y, dynamicPos.m_z, &vertexBuffer,
+                                  context.GetClipRegion());
++#endif
+     else
+       /* Append the vertices from the cache to the set collected since the first Begin() call */
+       m_vertex.insert(m_vertex.end(), vertices->begin(), vertices->end());
+@@ -1044,12 +1085,19 @@ void CGUIFontTTF::RenderCharacter(CGraphicContext& context,
+ 
+   // posX and posY are relative to our origin, and the textcell is offset
+   // from our (posX, posY).  Plus, these are unscaled quantities compared to the underlying GUI resolution
++#if defined(HAS_GL)
++  CRect vertex((posX + ch->m_offsetX), (posY + ch->m_offsetY), (posX + ch->m_offsetX + width),
++               (posY + ch->m_offsetY + height));
++#else
+   CRect vertex((posX + ch->m_offsetX) * context.GetGUIScaleX(),
+                (posY + ch->m_offsetY) * context.GetGUIScaleY(),
+                (posX + ch->m_offsetX + width) * context.GetGUIScaleX(),
+                (posY + ch->m_offsetY + height) * context.GetGUIScaleY());
+   vertex += CPoint(m_originX, m_originY);
++#endif
+   CRect texture(ch->m_left, ch->m_top, ch->m_right, ch->m_bottom);
++
++#if !defined(HAS_GL)
+   if (!m_renderSystem->ScissorsCanEffectClipping())
+     context.ClipRect(vertex, texture);
+ 
+@@ -1109,6 +1157,14 @@ void CGUIFontTTF::RenderCharacter(CGraphicContext& context,
+   const float tr = texture.x2 * m_textureScaleX;
+   const float tt = texture.y1 * m_textureScaleY;
+   const float tb = texture.y2 * m_textureScaleY;
++#else
++  // when scaling by shader, we have to grow the vertex and texture coords
++  // by .5 or we would ommit pixels when animating.
++  const float tl = (texture.x1 - .5f) * m_textureScaleX;
++  const float tr = (texture.x2 + .5f) * m_textureScaleX;
++  const float tt = (texture.y1 - .5f) * m_textureScaleY;
++  const float tb = (texture.y2 + .5f) * m_textureScaleY;
++#endif
+ 
+   vertices.resize(vertices.size() + VERTEX_PER_GLYPH);
+   SVertex* v = &vertices[vertices.size() - VERTEX_PER_GLYPH];
+@@ -1152,8 +1208,41 @@ void CGUIFontTTF::RenderCharacter(CGraphicContext& context,
+ 
+   v[3].u = tl;
+   v[3].v = tb;
+-#else
++#elif defined(HAS_GL)
+   // GL / GLES uses triangle strips, not quads, so have to rearrange the vertex order
++  // GL uses vertex shaders to manipulate text rotation/translation/scaling/clipping.
++
++  // nudge position to align with raster grid. messes up kerning, but also avoids
++  // linear filtering (when not scaled/rotated).
++  float xOffset = 0.0f;
++  if (roundX)
++    xOffset = (vertex.x1 - std::floor(vertex.x1));
++  float yOffset = (vertex.y1 - std::floor(vertex.y1));
++
++  v[0].u = tl;
++  v[0].v = tt;
++  v[0].x = vertex.x1 - xOffset - 0.5f;
++  v[0].y = vertex.y1 - yOffset - 0.5f;
++  v[0].z = 0;
++
++  v[1].u = tl;
++  v[1].v = tb;
++  v[1].x = vertex.x1 - xOffset - 0.5f;
++  v[1].y = vertex.y2 - yOffset + 0.5f;
++  v[1].z = 0;
++
++  v[2].u = tr;
++  v[2].v = tt;
++  v[2].x = vertex.x2 - xOffset + 0.5f;
++  v[2].y = vertex.y1 - yOffset - 0.5f;
++  v[2].z = 0;
++
++  v[3].u = tr;
++  v[3].v = tb;
++  v[3].x = vertex.x2 - xOffset + 0.5f;
++  v[3].y = vertex.y2 - yOffset + 0.5f;
++  v[3].z = 0;
++#else
+   v[0].u = tl;
+   v[0].v = tt;
+   v[0].x = x[0];
+diff --git a/xbmc/guilib/GUIFontTTF.h b/xbmc/guilib/GUIFontTTF.h
+index 2ed270343d471..02a0ac16df2f6 100644
+--- a/xbmc/guilib/GUIFontTTF.h
++++ b/xbmc/guilib/GUIFontTTF.h
+@@ -164,7 +164,9 @@ class CGUIFontTTF
+                         const vecText& text,
+                         uint32_t alignment,
+                         float maxPixelWidth,
+-                        bool scrolling);
++                        bool scrolling,
++                        float dx = 0.0f,
++                        float dy = 0.0f);
+ 
+   float m_height{0.0f};
+ 
+@@ -238,16 +240,22 @@ class CGUIFontTTF
+     float m_translateX;
+     float m_translateY;
+     float m_translateZ;
++    float m_offsetX; // skews the "raw" mesh before applying UI matrix (useful for scrolling)
++    float m_offsetY;
+     const CVertexBuffer* m_vertexBuffer;
+     CRect m_clip;
+     CTranslatedVertices(float translateX,
+                         float translateY,
+                         float translateZ,
+                         const CVertexBuffer* vertexBuffer,
+-                        const CRect& clip)
++                        const CRect& clip,
++                        float offsetX = 0.0f,
++                        float offsetY = 0.0f)
+       : m_translateX(translateX),
+         m_translateY(translateY),
+         m_translateZ(translateZ),
++        m_offsetX(offsetX),
++        m_offsetY(offsetY),
+         m_vertexBuffer(vertexBuffer),
+         m_clip(clip)
+     {
+diff --git a/xbmc/guilib/GUIFontTTFGL.cpp b/xbmc/guilib/GUIFontTTFGL.cpp
+index 12889c9b1dad1..96d230eb15290 100644
+--- a/xbmc/guilib/GUIFontTTFGL.cpp
++++ b/xbmc/guilib/GUIFontTTFGL.cpp
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -63,7 +63,18 @@ bool CGUIFontTTFGL::FirstBegin()
+     internalFormat = GL_R8;
+   else
+     internalFormat = GL_LUMINANCE;
++
+   renderSystem->EnableShader(ShaderMethodGL::SM_FONTS);
++  if (renderSystem->ScissorsCanEffectClipping())
++  {
++    m_scissorClip = true;
++  }
++  else
++  {
++    m_scissorClip = false;
++    renderSystem->ResetScissors();
++    renderSystem->EnableShader(ShaderMethodGL::SM_FONTS_SHADER_CLIP);
++  }
+ 
+   if (m_textureStatus == TEXTURE_REALLOCATED)
+   {
+@@ -117,6 +128,9 @@ bool CGUIFontTTFGL::FirstBegin()
+ 
+ void CGUIFontTTFGL::LastEnd()
+ {
++  // static vertex arrays are not supported anymore
++  assert(m_vertex.empty());
++
+   CWinSystemBase* const winSystem = CServiceBroker::GetWinSystem();
+   if (!winSystem)
+     return;
+@@ -126,7 +140,9 @@ void CGUIFontTTFGL::LastEnd()
+   GLint posLoc = renderSystem->ShaderGetPos();
+   GLint colLoc = renderSystem->ShaderGetCol();
+   GLint tex0Loc = renderSystem->ShaderGetCoord0();
+-  GLint modelLoc = renderSystem->ShaderGetModel();
++  GLint clipUniformLoc = renderSystem->ShaderGetClip();
++  GLint coordStepUniformLoc = renderSystem->ShaderGetCoordStep();
++  GLint matrixUniformLoc = renderSystem->ShaderGetMatrix();
+ 
+   CreateStaticVertexBuffers();
+ 
+@@ -135,44 +151,6 @@ void CGUIFontTTFGL::LastEnd()
+   glEnableVertexAttribArray(colLoc);
+   glEnableVertexAttribArray(tex0Loc);
+ 
+-  if (!m_vertex.empty())
+-  {
+-
+-    // Deal with vertices that had to use software clipping
+-    std::vector<SVertex> vecVertices(6 * (m_vertex.size() / 4));
+-    SVertex* vertices = &vecVertices[0];
+-    for (size_t i = 0; i < m_vertex.size(); i += 4)
+-    {
+-      *vertices++ = m_vertex[i];
+-      *vertices++ = m_vertex[i + 1];
+-      *vertices++ = m_vertex[i + 2];
+-
+-      *vertices++ = m_vertex[i + 1];
+-      *vertices++ = m_vertex[i + 3];
+-      *vertices++ = m_vertex[i + 2];
+-    }
+-    vertices = &vecVertices[0];
+-
+-    GLuint VertexVBO;
+-
+-    glGenBuffers(1, &VertexVBO);
+-    glBindBuffer(GL_ARRAY_BUFFER, VertexVBO);
+-    glBufferData(GL_ARRAY_BUFFER, sizeof(SVertex) * vecVertices.size(), &vecVertices[0],
+-                 GL_STATIC_DRAW);
+-
+-    glVertexAttribPointer(posLoc, 3, GL_FLOAT, GL_FALSE, sizeof(SVertex),
+-                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, x)));
+-    glVertexAttribPointer(colLoc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(SVertex),
+-                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, r)));
+-    glVertexAttribPointer(tex0Loc, 2, GL_FLOAT, GL_FALSE, sizeof(SVertex),
+-                          reinterpret_cast<const GLvoid*>(offsetof(SVertex, u)));
+-
+-    glDrawArrays(GL_TRIANGLES, 0, vecVertices.size());
+-
+-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+-    glDeleteBuffers(1, &VertexVBO);
+-  }
+-
+   if (!m_vertexTrans.empty())
+   {
+     // Deal with the vertices that can be hardware clipped and therefore translated
+@@ -199,14 +177,55 @@ void CGUIFontTTFGL::LastEnd()
+         // skip empty clip
+         if (clip.IsEmpty())
+           continue;
++      }
++
++      if (m_scissorClip)
++      {
++        // clip using scissors
+         renderSystem->SetScissors(clip);
+       }
++      else
++      {
++        // clip using vertex shader
++        renderSystem->ResetScissors();
++
++        float x1 =
++            m_vertexTrans[i].m_clip.x1 - m_vertexTrans[i].m_translateX - m_vertexTrans[i].m_offsetX;
++        float y1 =
++            m_vertexTrans[i].m_clip.y1 - m_vertexTrans[i].m_translateY - m_vertexTrans[i].m_offsetY;
++        float x2 =
++            m_vertexTrans[i].m_clip.x2 - m_vertexTrans[i].m_translateX - m_vertexTrans[i].m_offsetX;
++        float y2 =
++            m_vertexTrans[i].m_clip.y2 - m_vertexTrans[i].m_translateY - m_vertexTrans[i].m_offsetY;
++
++        glUniform4f(clipUniformLoc, x1, y1, x2, y2);
++
++        // setup texture step
++        float stepX = context.GetGUIScaleX() / (static_cast<float>(m_textureWidth));
++        float stepY = context.GetGUIScaleY() / (static_cast<float>(m_textureHeight));
++        glUniform4f(coordStepUniformLoc, stepX, stepY, 1.0f, 1.0f);
++      }
+ 
+-      // Apply the translation to the currently active (top-of-stack) model view matrix
+-      glMatrixModview.Push();
+-      glMatrixModview.Get().Translatef(m_vertexTrans[i].m_translateX, m_vertexTrans[i].m_translateY,
+-                                       m_vertexTrans[i].m_translateZ);
+-      glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glMatrixModview.Get());
++      // calculate the fractional offset to the ideal position
++      float fractX =
++          context.ScaleFinalXCoord(m_vertexTrans[i].m_translateX, m_vertexTrans[i].m_translateY);
++      float fractY =
++          context.ScaleFinalYCoord(m_vertexTrans[i].m_translateX, m_vertexTrans[i].m_translateY);
++      fractX = -fractX + std::round(fractX);
++      fractY = -fractY + std::round(fractY);
++
++      // proj * model * gui * scroll * translation * scaling * correction factor
++      CMatrixGL matrix = glMatrixProject.Get();
++      matrix.MultMatrixf(glMatrixModview.Get());
++      matrix.MultMatrixf(CMatrixGL(context.GetGUIMatrix()));
++      matrix.Translatef(m_vertexTrans[i].m_offsetX, m_vertexTrans[i].m_offsetY, 0.0f);
++      matrix.Translatef(m_vertexTrans[i].m_translateX, m_vertexTrans[i].m_translateY, 0.0f);
++      // the gui matrix messes with the scale. correct it here for now.
++      matrix.Scalef(context.GetGUIScaleX(), context.GetGUIScaleY(), 1.0f);
++      // the gui matrix doesn't align to exact pixel coords atm. correct it here for now.
++      matrix.Translatef(fractX, fractY, 0.0f);
++
++      glUniformMatrix4fv(matrixUniformLoc, 1, GL_FALSE, matrix);
+ 
+       // Bind the buffer to the OpenGL context's GL_ARRAY_BUFFER binding point
+       glBindBuffer(GL_ARRAY_BUFFER, m_vertexTrans[i].m_vertexBuffer->bufferHandle);
+@@ -233,13 +252,12 @@ void CGUIFontTTFGL::LastEnd()
+ 
+         glDrawElements(GL_TRIANGLES, 6 * count, GL_UNSIGNED_SHORT, 0);
+       }
+-
+-      glMatrixModview.Pop();
+     }
++
+     // Restore the original scissor rectangle
+-    renderSystem->SetScissors(scissor);
+-    // Restore the original model view matrix
+-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glMatrixModview.Get());
++    if (m_scissorClip)
++      renderSystem->SetScissors(scissor);
++
+     // Unbind GL_ARRAY_BUFFER and GL_ELEMENT_ARRAY_BUFFER
+     glBindBuffer(GL_ARRAY_BUFFER, 0);
+     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+diff --git a/xbmc/guilib/GUIFontTTFGL.h b/xbmc/guilib/GUIFontTTFGL.h
+index 22fbe6419b81c..e59a54a23c066 100644
+--- a/xbmc/guilib/GUIFontTTFGL.h
++++ b/xbmc/guilib/GUIFontTTFGL.h
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -55,4 +55,6 @@ class CGUIFontTTFGL : public CGUIFontTTF
+   TextureStatus m_textureStatus{TEXTURE_VOID};
+ 
+   static bool m_staticVertexBufferCreated;
++
++  bool m_scissorClip{false};
+ };
+diff --git a/xbmc/rendering/gl/GLShader.cpp b/xbmc/rendering/gl/GLShader.cpp
+index e91af97b562c4..77dd6e4ed259e 100644
+--- a/xbmc/rendering/gl/GLShader.cpp
++++ b/xbmc/rendering/gl/GLShader.cpp
+@@ -1,12 +1,11 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+  *  See LICENSES/README.md for more information.
+  */
+ 
+-
+ #include "GLShader.h"
+ 
+ #include "ServiceBroker.h"
+@@ -49,6 +48,9 @@ void CGLShader::OnCompiledAndLinked()
+   // Variables passed directly to the Vertex shader
+   m_hProj = glGetUniformLocation(ProgramHandle(), "m_proj");
+   m_hModel = glGetUniformLocation(ProgramHandle(), "m_model");
++  m_hMatrix = glGetUniformLocation(ProgramHandle(), "m_matrix");
++  m_hShaderClip = glGetUniformLocation(ProgramHandle(), "m_shaderClip");
++  m_hCoordStep = glGetUniformLocation(ProgramHandle(), "m_cordStep");
+ 
+   // Vertex attributes
+   m_hPos = glGetAttribLocation(ProgramHandle(),  "m_attrpos");
+diff --git a/xbmc/rendering/gl/GLShader.h b/xbmc/rendering/gl/GLShader.h
+index d5b82f3a075b7..791c44926bd7e 100644
+--- a/xbmc/rendering/gl/GLShader.h
++++ b/xbmc/rendering/gl/GLShader.h
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -27,6 +27,9 @@ class CGLShader : public Shaders::CGLSLShaderProgram
+   GLint GetCord1Loc() {return m_hCord1;}
+   GLint GetUniColLoc() {return m_hUniCol;}
+   GLint GetModelLoc() {return m_hModel; }
++  GLint GetMatrixLoc() { return m_hMatrix; }
++  GLint GetShaderClipLoc() { return m_hShaderClip; }
++  GLint GetShaderCoordStepLoc() { return m_hCoordStep; }
+   bool HardwareClipIsPossible() {return m_clipPossible; }
+   GLfloat GetClipXFactor() {return m_clipXFactor; }
+   GLfloat GetClipXOffset() {return m_clipXOffset; }
+@@ -39,6 +42,9 @@ class CGLShader : public Shaders::CGLSLShaderProgram
+   GLint m_hUniCol = 0;
+   GLint m_hProj = 0;
+   GLint m_hModel = 0;
++  GLint m_hMatrix{0}; // m_hProj * m_hModel
++  GLint m_hShaderClip{0}; // clipping rect vec4(x1,y1,x2,y2)
++  GLint m_hCoordStep{0}; // step (1/resolution) for the two textures vec4(t1.x,t1.y,t2.x,t2.y)
+   GLint m_hPos = 0;
+   GLint m_hCol = 0;
+   GLint m_hCord0 = 0;
+diff --git a/xbmc/rendering/gl/RenderSystemGL.cpp b/xbmc/rendering/gl/RenderSystemGL.cpp
+index 4b80014d41386..516027ef49134 100644
+--- a/xbmc/rendering/gl/RenderSystemGL.cpp
++++ b/xbmc/rendering/gl/RenderSystemGL.cpp
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -682,13 +682,24 @@ void CRenderSystemGL::InitialiseShaders()
+     CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_multi.glsl - compile and link failed");
+   }
+ 
+-  m_pShader[ShaderMethodGL::SM_FONTS] =
+-      std::make_unique<CGLShader>("gl_shader_frag_fonts.glsl", defines);
++  m_pShader[ShaderMethodGL::SM_FONTS] = std::make_unique<CGLShader>(
++      "gl_shader_vert_simple.glsl", "gl_shader_frag_fonts.glsl", defines);
+   if (!m_pShader[ShaderMethodGL::SM_FONTS]->CompileAndLink())
+   {
+     m_pShader[ShaderMethodGL::SM_FONTS]->Free();
+     m_pShader[ShaderMethodGL::SM_FONTS].reset();
+-    CLog::Log(LOGERROR, "GUI Shader gl_shader_frag_fonts.glsl - compile and link failed");
++    CLog::Log(LOGERROR, "GUI Shader gl_shader_vert_simple.glsl + gl_shader_frag_fonts.glsl - "
++                        "compile and link failed");
++  }
++
++  m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP] =
++      std::make_unique<CGLShader>("gl_shader_vert_clip.glsl", "gl_shader_frag_fonts.glsl", defines);
++  if (!m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP]->CompileAndLink())
++  {
++    m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP]->Free();
++    m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP].reset();
++    CLog::Log(LOGERROR, "GUI Shader gl_shader_vert_clip.glsl + gl_shader_frag_fonts.glsl - compile "
++                        "and link failed");
+   }
+ 
+   m_pShader[ShaderMethodGL::SM_TEXTURE_NOBLEND] =
+@@ -732,6 +743,10 @@ void CRenderSystemGL::ReleaseShaders()
+     m_pShader[ShaderMethodGL::SM_FONTS]->Free();
+   m_pShader[ShaderMethodGL::SM_FONTS].reset();
+ 
++  if (m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP])
++    m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP]->Free();
++  m_pShader[ShaderMethodGL::SM_FONTS_SHADER_CLIP].reset();
++
+   if (m_pShader[ShaderMethodGL::SM_TEXTURE_NOBLEND])
+     m_pShader[ShaderMethodGL::SM_TEXTURE_NOBLEND]->Free();
+   m_pShader[ShaderMethodGL::SM_TEXTURE_NOBLEND].reset();
+@@ -811,6 +826,30 @@ GLint CRenderSystemGL::ShaderGetModel()
+   return -1;
+ }
+ 
++GLint CRenderSystemGL::ShaderGetMatrix()
++{
++  if (m_pShader[m_method])
++    return m_pShader[m_method]->GetMatrixLoc();
++
++  return -1;
++}
++
++GLint CRenderSystemGL::ShaderGetClip()
++{
++  if (m_pShader[m_method])
++    return m_pShader[m_method]->GetShaderClipLoc();
++
++  return -1;
++}
++
++GLint CRenderSystemGL::ShaderGetCoordStep()
++{
++  if (m_pShader[m_method])
++    return m_pShader[m_method]->GetShaderCoordStepLoc();
++
++  return -1;
++}
++
+ std::string CRenderSystemGL::GetShaderPath(const std::string &filename)
+ {
+   std::string path = "GL/1.2/";
+diff --git a/xbmc/rendering/gl/RenderSystemGL.h b/xbmc/rendering/gl/RenderSystemGL.h
+index 191c97ff961fc..520c552e45ab5 100644
+--- a/xbmc/rendering/gl/RenderSystemGL.h
++++ b/xbmc/rendering/gl/RenderSystemGL.h
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2005-2018 Team Kodi
++ *  Copyright (C) 2005-2024 Team Kodi
+  *  This file is part of Kodi - https://kodi.tv
+  *
+  *  SPDX-License-Identifier: GPL-2.0-or-later
+@@ -27,6 +27,7 @@ enum class ShaderMethodGL
+   SM_TEXTURE_LIM,
+   SM_MULTI,
+   SM_FONTS,
++  SM_FONTS_SHADER_CLIP,
+   SM_TEXTURE_NOBLEND,
+   SM_MULTI_BLENDCOLOR,
+   SM_MAX
+@@ -52,6 +53,7 @@ struct fmt::formatter<ShaderMethodGL> : fmt::formatter<std::string_view>
+       {ShaderMethodGL::SM_TEXTURE_LIM, "texture limited"},
+       {ShaderMethodGL::SM_MULTI, "multi"},
+       {ShaderMethodGL::SM_FONTS, "fonts"},
++      {ShaderMethodGL::SM_FONTS_SHADER_CLIP, "fonts with vertex shader based clipping"},
+       {ShaderMethodGL::SM_TEXTURE_NOBLEND, "texture no blending"},
+       {ShaderMethodGL::SM_MULTI_BLENDCOLOR, "multi blend colour"},
+   });
+@@ -114,6 +116,9 @@ class CRenderSystemGL : public CRenderSystemBase
+   GLint ShaderGetCoord1();
+   GLint ShaderGetUniCol();
+   GLint ShaderGetModel();
++  GLint ShaderGetMatrix();
++  GLint ShaderGetClip();
++  GLint ShaderGetCoordStep();
+ 
+ protected:
+   virtual void SetVSyncImpl(bool enable) = 0;
