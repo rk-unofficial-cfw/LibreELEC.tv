@@ -234,3 +234,737 @@ index 014f99e8928e..16e6aa01e400 100644
  	.rb_swap = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 12),
  	.uv_swap = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 15),
  	.x_mir_en = VOP_REG(RK3288_WIN0_CTRL0, 0x1, 21),
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 01/13] arm64: dts: rockchip: Increase VOP clk rate on RK3328
+Date: Sat, 15 Jun 2024 17:03:52 +0000
+
+The VOP on RK3328 needs to run at a higher rate in order to produce a
+proper 3840x2160 signal.
+
+Change to use 300MHz for VIO clk and 400MHz for VOP clk, same rates used
+by vendor 4.4 kernel.
+
+Fixes: 52e02d377a72 ("arm64: dts: rockchip: add core dtsi file for RK3328 SoCs")
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 07dcc949b899..b01efd6d042c 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -850,8 +850,8 @@ cru: clock-controller@ff440000 {
+ 			<0>, <24000000>,
+ 			<24000000>, <24000000>,
+ 			<15000000>, <15000000>,
+-			<100000000>, <100000000>,
+-			<100000000>, <100000000>,
++			<300000000>, <100000000>,
++			<400000000>, <100000000>,
+ 			<50000000>, <100000000>,
+ 			<100000000>, <100000000>,
+ 			<50000000>, <50000000>,
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 02/13] clk: rockchip: Set parent rate for DCLK_VOP clock on RK3228
+Date: Sat, 15 Jun 2024 17:03:53 +0000
+
+Similar to DCLK_LCDC on RK3328, the DCLK_VOP on RK3228 is typically
+parented by the hdmiphy clk and it is expected that the DCLK_VOP and
+hdmiphy clk rate are kept in sync.
+
+Use CLK_SET_RATE_PARENT and CLK_SET_RATE_NO_REPARENT flags, same as used
+on RK3328, to make full use of all possible supported display modes.
+
+Fixes: 0a9d4ac08ebc ("clk: rockchip: set the clock ids for RK3228 VOP")
+Fixes: 307a2e9ac524 ("clk: rockchip: add clock controller for rk3228")
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/clk/rockchip/clk-rk3228.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+index a24a35553e13..7343d2d7676b 100644
+--- a/drivers/clk/rockchip/clk-rk3228.c
++++ b/drivers/clk/rockchip/clk-rk3228.c
+@@ -409,7 +409,7 @@ static struct rockchip_clk_branch rk3228_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(29), 0, 3, DFLAGS),
+ 	DIV(0, "sclk_vop_pre", "sclk_vop_src", 0,
+ 			RK2928_CLKSEL_CON(27), 8, 8, DFLAGS),
+-	MUX(DCLK_VOP, "dclk_vop", mux_dclk_vop_p, 0,
++	MUX(DCLK_VOP, "dclk_vop", mux_dclk_vop_p, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
+ 			RK2928_CLKSEL_CON(27), 1, 1, MFLAGS),
+ 
+ 	FACTOR(0, "xin12m", "xin24m", 0, 1, 2),
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 03/13] drm/rockchip: vop: Allow 4096px width scaling
+Date: Sat, 15 Jun 2024 17:03:54 +0000
+
+From: Alex Bee <knaerzche@gmail.com>
+
+There is no reason to limit VOP scaling to 3840px width, the limit of
+RK3288, when there are newer VOP versions that support 4096px width.
+
+Change to enforce a maximum of 4096px width plane scaling, the maximum
+supported output width of the VOP versions supported by this driver.
+
+Fixes: 4c156c21c794 ("drm/rockchip: vop: support plane scale")
+Signed-off-by: Alex Bee <knaerzche@gmail.com>
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index a13473b2d54c..4a9c6ea7f15d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -396,8 +396,8 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
+ 	if (info->is_yuv)
+ 		is_yuv = true;
+ 
+-	if (dst_w > 3840) {
+-		DRM_DEV_ERROR(vop->dev, "Maximum dst width (3840) exceeded\n");
++	if (dst_w > 4096) {
++		DRM_DEV_ERROR(vop->dev, "Maximum dst width (4096) exceeded\n");
+ 		return;
+ 	}
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 04/13] drm/rockchip: dw_hdmi: Fix reading EDID when using a forced mode
+Date: Sat, 15 Jun 2024 17:03:55 +0000
+
+EDID cannot be read on RK3328 until after read_hpd has been called and
+correct io voltage has been configured based on connection status.
+
+When a forced mode is used, e.g. video=1920x1080@60e, the connector
+detect ops, that in turn normally calls the read_hpd, never gets called.
+
+This result in reading EDID to fail in connector get_modes ops.
+
+Call dw_hdmi_rk3328_read_hpd at end of dw_hdmi_rk3328_setup_hpd to
+correct io voltage and allow reading EDID after setup_hpd.
+
+Fixes: 1c53ba8f22a1 ("drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328")
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index fe33092abbe7..aae48e906af1 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -434,6 +434,8 @@ static void dw_hdmi_rk3328_setup_hpd(struct dw_hdmi *dw_hdmi, void *data)
+ 		HIWORD_UPDATE(RK3328_HDMI_SDAIN_MSK | RK3328_HDMI_SCLIN_MSK,
+ 			      RK3328_HDMI_SDAIN_MSK | RK3328_HDMI_SCLIN_MSK |
+ 			      RK3328_HDMI_HPD_IOE));
++
++	dw_hdmi_rk3328_read_hpd(dw_hdmi, data);
+ }
+ 
+ static const struct dw_hdmi_phy_ops rk3228_hdmi_phy_ops = {
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 05/13] drm/rockchip: dw_hdmi: Allow High TMDS Bit Rates
+Date: Sat, 15 Jun 2024 17:03:56 +0000
+
+Call dw_hdmi_set_high_tmds_clock_ratio in phy init ops to allow support
+of High TMDS Bit Rates used by HDMI2.0 display modes.
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index aae48e906af1..5df9c9a0d369 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -362,6 +362,8 @@ static int dw_hdmi_rockchip_genphy_init(struct dw_hdmi *dw_hdmi, void *data,
+ {
+ 	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
+ 
++	dw_hdmi_set_high_tmds_clock_ratio(dw_hdmi, display);
++
+ 	return phy_power_on(hdmi->phy);
+ }
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 06/13] drm/rockchip: dw_hdmi: Add max_tmds_clock validation
+Date: Sat, 15 Jun 2024 17:03:57 +0000
+
+Add max_tmds_clock validation to prepare for additions and changes to
+the MPLL config table. Use the same rate restrictions that is currently
+applied.
+
+The rate limit for RK3288, RK3399 and RK3568 is based on current mpll
+table. The rate limit for RK3228 and RK3228 is based on the
+inno-hdmi-phy pre-pll table.
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 5df9c9a0d369..75b5d63ec570 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -61,11 +61,13 @@
+  * @lcdsel_grf_reg: grf register offset of lcdc select
+  * @lcdsel_big: reg value of selecting vop big for HDMI
+  * @lcdsel_lit: reg value of selecting vop little for HDMI
++ * @max_tmds_clock: maximum TMDS clock rate supported
+  */
+ struct rockchip_hdmi_chip_data {
+ 	int	lcdsel_grf_reg;
+ 	u32	lcdsel_big;
+ 	u32	lcdsel_lit;
++	int	max_tmds_clock;
+ };
+ 
+ struct rockchip_hdmi {
+@@ -259,6 +261,10 @@ dw_hdmi_rockchip_mode_valid(struct dw_hdmi *dw_hdmi, void *data,
+ 	bool exact_match = hdmi->plat_data->phy_force_vendor;
+ 	int i;
+ 
++	if (hdmi->chip_data->max_tmds_clock &&
++	    mode->clock > hdmi->chip_data->max_tmds_clock)
++		return MODE_CLOCK_HIGH;
++
+ 	if (hdmi->ref_clk) {
+ 		int rpclk = clk_round_rate(hdmi->ref_clk, pclk);
+ 
+@@ -450,6 +456,7 @@ static const struct dw_hdmi_phy_ops rk3228_hdmi_phy_ops = {
+ 
+ static struct rockchip_hdmi_chip_data rk3228_chip_data = {
+ 	.lcdsel_grf_reg = -1,
++	.max_tmds_clock = 594000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3228_hdmi_drv_data = {
+@@ -467,6 +474,7 @@ static struct rockchip_hdmi_chip_data rk3288_chip_data = {
+ 	.lcdsel_grf_reg = RK3288_GRF_SOC_CON6,
+ 	.lcdsel_big = HIWORD_UPDATE(0, RK3288_HDMI_LCDC_SEL),
+ 	.lcdsel_lit = HIWORD_UPDATE(RK3288_HDMI_LCDC_SEL, RK3288_HDMI_LCDC_SEL),
++	.max_tmds_clock = 340000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
+@@ -487,6 +495,7 @@ static const struct dw_hdmi_phy_ops rk3328_hdmi_phy_ops = {
+ 
+ static struct rockchip_hdmi_chip_data rk3328_chip_data = {
+ 	.lcdsel_grf_reg = -1,
++	.max_tmds_clock = 594000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3328_hdmi_drv_data = {
+@@ -505,6 +514,7 @@ static struct rockchip_hdmi_chip_data rk3399_chip_data = {
+ 	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
+ 	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
+ 	.lcdsel_lit = HIWORD_UPDATE(RK3399_HDMI_LCDC_SEL, RK3399_HDMI_LCDC_SEL),
++	.max_tmds_clock = 340000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
+@@ -518,6 +528,7 @@ static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
+ 
+ static struct rockchip_hdmi_chip_data rk3568_chip_data = {
+ 	.lcdsel_grf_reg = -1,
++	.max_tmds_clock = 340000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3568_hdmi_drv_data = {
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 07/13] drm/rockchip: dw_hdmi: Filter modes based on hdmiphy_clk
+Date: Sat, 15 Jun 2024 17:03:58 +0000
+
+RK3228 and RK3328 clock rate is being validated against a mpll config
+table intended for Synopsys phy, and not the inno-hdmi-phy used.
+
+Instead get a reference to the hdmiphy clk and validate rates against
+it to enable use of HDMI2.0 modes, e.g. 4K@60Hz, on RK3228 and RK3328.
+
+For Synopsis phy the max_tmds_clock validation is sufficient.
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 35 ++++++++++-----------
+ 1 file changed, 17 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 75b5d63ec570..4acf73b5692a 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -76,6 +76,7 @@ struct rockchip_hdmi {
+ 	struct rockchip_encoder encoder;
+ 	const struct rockchip_hdmi_chip_data *chip_data;
+ 	const struct dw_hdmi_plat_data *plat_data;
++	struct clk *hdmiphy_clk;
+ 	struct clk *ref_clk;
+ 	struct clk *grf_clk;
+ 	struct dw_hdmi *hdmi;
+@@ -256,10 +257,7 @@ dw_hdmi_rockchip_mode_valid(struct dw_hdmi *dw_hdmi, void *data,
+ 			    const struct drm_display_mode *mode)
+ {
+ 	struct rockchip_hdmi *hdmi = data;
+-	const struct dw_hdmi_mpll_config *mpll_cfg = rockchip_mpll_cfg;
+ 	int pclk = mode->clock * 1000;
+-	bool exact_match = hdmi->plat_data->phy_force_vendor;
+-	int i;
+ 
+ 	if (hdmi->chip_data->max_tmds_clock &&
+ 	    mode->clock > hdmi->chip_data->max_tmds_clock)
+@@ -268,26 +266,18 @@ dw_hdmi_rockchip_mode_valid(struct dw_hdmi *dw_hdmi, void *data,
+ 	if (hdmi->ref_clk) {
+ 		int rpclk = clk_round_rate(hdmi->ref_clk, pclk);
+ 
+-		if (abs(rpclk - pclk) > pclk / 1000)
++		if (rpclk < 0 || abs(rpclk - pclk) > pclk / 1000)
+ 			return MODE_NOCLOCK;
+ 	}
+ 
+-	for (i = 0; mpll_cfg[i].mpixelclock != (~0UL); i++) {
+-		/*
+-		 * For vendor specific phys force an exact match of the pixelclock
+-		 * to preserve the original behaviour of the driver.
+-		 */
+-		if (exact_match && pclk == mpll_cfg[i].mpixelclock)
+-			return MODE_OK;
+-		/*
+-		 * The Synopsys phy can work with pixelclocks up to the value given
+-		 * in the corresponding mpll_cfg entry.
+-		 */
+-		if (!exact_match && pclk <= mpll_cfg[i].mpixelclock)
+-			return MODE_OK;
++	if (hdmi->hdmiphy_clk) {
++		int rpclk = clk_round_rate(hdmi->hdmiphy_clk, pclk);
++
++		if (rpclk < 0 || abs(rpclk - pclk) > pclk / 1000)
++			return MODE_NOCLOCK;
+ 	}
+ 
+-	return MODE_BAD;
++	return MODE_OK;
+ }
+ 
+ static void dw_hdmi_rockchip_encoder_disable(struct drm_encoder *encoder)
+@@ -638,6 +628,15 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		goto err_clk;
+ 	}
+ 
++	if (hdmi->phy) {
++		struct of_phandle_args clkspec;
++
++		clkspec.np = hdmi->phy->dev.of_node;
++		hdmi->hdmiphy_clk = of_clk_get_from_provider(&clkspec);
++		if (IS_ERR(hdmi->hdmiphy_clk))
++			hdmi->hdmiphy_clk = NULL;
++	}
++
+ 	if (hdmi->chip_data == &rk3568_chip_data) {
+ 		regmap_write(hdmi->regmap, RK3568_GRF_VO_CON1,
+ 			     HIWORD_UPDATE(RK3568_HDMI_SDAIN_MSK |
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 08/13] drm/rockchip: dw_hdmi: Adjust cklvl & txlvl for RF/EMI
+Date: Sat, 15 Jun 2024 17:03:59 +0000
+
+From: Yakir Yang <ykk@rock-chips.com>
+
+Dut to the high HDMI signal voltage driver, Mickey have meet
+a serious RF/EMI problem, so we decided to reduce HDMI signal
+voltage to a proper value.
+
+The default params for phy is cklvl = 20 & txlvl = 13 (RF/EMI failed)
+  ck: lvl = 13, term=100, vlo = 2.71, vhi=3.14, vswing = 0.43
+  tx: lvl = 20, term=100, vlo = 2.81, vhi=3.16, vswing = 0.35
+
+1. We decided to reduce voltage value to lower, but VSwing still
+keep high, RF/EMI have been improved but still failed.
+   ck: lvl =  6, term=100, vlo = 2.61, vhi=3.11, vswing = 0.50
+   tx: lvl =  6, term=100, vlo = 2.61, vhi=3.11, vswing = 0.50
+
+2. We try to keep voltage value and vswing both lower, then RF/EMI
+test all passed  ;)
+   ck: lvl = 11, term= 66, vlo = 2.68, vhi=3.09, vswing = 0.40
+   tx: lvl = 11, term= 66, vlo = 2.68, vhi=3.09, vswing = 0.40
+When we back to run HDMI different test and single-end test, we see
+different test passed, but signle-end test failed. The oscilloscope
+show that simgle-end clock's VL value is 1.78v (which remind LowLimit
+should not lower then 2.6v).
+
+3. That's to say there are some different between PHY document and
+measure value. And according to experiment 2 results, we need to
+higher clock voltage and lower data voltage, then we can keep RF/EMI
+satisfied and single-end & differen test passed.
+  ck: lvl =  9, term=100, vlo = 2.65, vhi=3.12, vswing = 0.47
+  tx: lvl = 16, term=100, vlo = 2.75, vhi=3.15, vswing = 0.39
+
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 4acf73b5692a..205cfe02079f 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -204,7 +204,7 @@ static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
+ static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
+ 	/*pixelclk   symbol   term   vlev*/
+ 	{ 74250000,  0x8009, 0x0004, 0x0272},
+-	{ 148500000, 0x802b, 0x0004, 0x028d},
++	{ 165000000, 0x802b, 0x0004, 0x0209},
+ 	{ 297000000, 0x8039, 0x0005, 0x028d},
+ 	{ ~0UL,	     0x0000, 0x0000, 0x0000}
+ };
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 09/13] drm/rockchip: dw_hdmi: Add phy_config for 594Mhz pixel clock
+Date: Sat, 15 Jun 2024 17:04:00 +0000
+
+From: Nickey Yang <nickey.yang@rock-chips.com>
+
+Add phy_config for 594Mhz pixel clock used for HDMI2.0 display modes.
+
+Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 205cfe02079f..9d5bd7455180 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -206,6 +206,7 @@ static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
+ 	{ 74250000,  0x8009, 0x0004, 0x0272},
+ 	{ 165000000, 0x802b, 0x0004, 0x0209},
+ 	{ 297000000, 0x8039, 0x0005, 0x028d},
++	{ 594000000, 0x8039, 0x0000, 0x019d},
+ 	{ ~0UL,	     0x0000, 0x0000, 0x0000}
+ };
+ 
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 10/13] drm/rockchip: dw_hdmi: Set cur_ctr to 0 always
+Date: Sat, 15 Jun 2024 17:04:01 +0000
+
+From: Douglas Anderson <dianders@chromium.org>
+
+Jitter was improved by lowering the MPLL bandwidth to account for high
+frequency noise in the rk3288 PLL.  In each case MPLL bandwidth was
+lowered only enough to get us a comfortable margin.  We believe that
+lowering the bandwidth like this is safe given sufficient testing.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 9d5bd7455180..e532c6d294dc 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -181,23 +181,9 @@ static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
+ static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
+ 	/*      pixelclk    bpp8    bpp10   bpp12 */
+ 	{
+-		40000000,  { 0x0018, 0x0018, 0x0018 },
+-	}, {
+-		65000000,  { 0x0028, 0x0028, 0x0028 },
+-	}, {
+-		66000000,  { 0x0038, 0x0038, 0x0038 },
+-	}, {
+-		74250000,  { 0x0028, 0x0038, 0x0038 },
+-	}, {
+-		83500000,  { 0x0028, 0x0038, 0x0038 },
+-	}, {
+-		146250000, { 0x0038, 0x0038, 0x0038 },
+-	}, {
+-		148500000, { 0x0000, 0x0038, 0x0038 },
+-	}, {
+ 		600000000, { 0x0000, 0x0000, 0x0000 },
+ 	}, {
+-		~0UL,      { 0x0000, 0x0000, 0x0000},
++		~0UL,      { 0x0000, 0x0000, 0x0000 },
+ 	}
+ };
+ 
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 11/13] drm/rockchip: dw_hdmi: Use auto-generated tables
+Date: Sat, 15 Jun 2024 17:04:02 +0000
+
+From: Douglas Anderson <dianders@chromium.org>
+
+The previous tables for mpll_cfg and curr_ctrl were created using the
+20-pages of example settings provided by the PHY vendor.  Those
+example settings weren't particularly dense, so there were places
+where we were guessing what the settings would be for 10-bit and
+12-bit (not that we use those anyway).  It was also always a lot of
+extra work every time we wanted to add a new clock rate since we had
+to cross-reference several tables.
+
+In <https://crrev.com/c/285855> I've gone through the work to figure
+out how to generate this table automatically.  Let's now use the
+automatically generated table and then we'll never need to look at it
+again.
+
+We only support 8-bit mode right now and only support a small number
+of clock rates and I've verified that the only 8-bit rate that was
+affected was 148.5.  That mode appears to have been wrong in the old
+table.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 104 ++++++++++----------
+ 1 file changed, 53 insertions(+), 51 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index e532c6d294dc..d9886b1c299c 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -94,74 +94,70 @@ static struct rockchip_hdmi *to_rockchip_hdmi(struct drm_encoder *encoder)
+ 
+ static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
+ 	{
+-		27000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++		30666000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40f3, 0x0000 },
+ 		},
+ 	}, {
+-		36000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++		36800000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40a2, 0x0001 },
+ 		},
+ 	}, {
+-		40000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++		46000000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
+ 		},
+ 	}, {
+-		54000000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2142, 0x0001},
+-			{ 0x40a2, 0x0001},
++		61333000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
+ 		},
+ 	}, {
+-		65000000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2142, 0x0001},
+-			{ 0x40a2, 0x0001},
++		73600000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x4061, 0x0002 },
+ 		},
+ 	}, {
+-		66000000, {
+-			{ 0x013e, 0x0003},
+-			{ 0x217e, 0x0002},
+-			{ 0x4061, 0x0002}
++		92000000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
+ 		},
+ 	}, {
+-		74250000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++		122666000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
+ 		},
+ 	}, {
+-		83500000, {
+-			{ 0x0072, 0x0001},
++		147200000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4064, 0x0003 },
+ 		},
+ 	}, {
+-		108000000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++		184000000, {
++			{ 0x0051, 0x0002 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
+ 		},
+ 	}, {
+-		106500000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
+-		},
+-	}, {
+-		146250000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++		226666000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
+ 		},
+ 	}, {
+-		148500000, {
+-			{ 0x0051, 0x0003},
+-			{ 0x214c, 0x0003},
+-			{ 0x4064, 0x0003}
++		272000000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x5a64, 0x0003 },
+ 		},
+ 	}, {
+ 		340000000, {
+@@ -169,11 +165,17 @@ static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
+ 			{ 0x3b4c, 0x0003 },
+ 			{ 0x5a64, 0x0003 },
+ 		},
++	}, {
++		600000000, {
++			{ 0x1a40, 0x0003 },
++			{ 0x3b4c, 0x0003 },
++			{ 0x5a64, 0x0003 },
++		},
+ 	}, {
+ 		~0UL, {
+-			{ 0x00a0, 0x000a },
+-			{ 0x2001, 0x000f },
+-			{ 0x4002, 0x000f },
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
+ 		},
+ 	}
+ };
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 12/13] drm/rockchip: dw_hdmi: Enable 4K@60Hz mode on RK3399 and RK356x
+Date: Sat, 15 Jun 2024 17:04:03 +0000
+
+Use a maximum TMDS clock rate limit of 594MHz to enable use of HDMI2.0
+modes, e.g. 4K@60Hz, on RK3399 and RK3568.
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index d9886b1c299c..b255b8ceedb7 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -493,7 +493,7 @@ static struct rockchip_hdmi_chip_data rk3399_chip_data = {
+ 	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
+ 	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
+ 	.lcdsel_lit = HIWORD_UPDATE(RK3399_HDMI_LCDC_SEL, RK3399_HDMI_LCDC_SEL),
+-	.max_tmds_clock = 340000,
++	.max_tmds_clock = 594000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
+@@ -507,7 +507,7 @@ static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
+ 
+ static struct rockchip_hdmi_chip_data rk3568_chip_data = {
+ 	.lcdsel_grf_reg = -1,
+-	.max_tmds_clock = 340000,
++	.max_tmds_clock = 594000,
+ };
+ 
+ static const struct dw_hdmi_plat_data rk3568_hdmi_drv_data = {
+
+From: Jonas Karlman <jonas@kwiboo.se>
+Subject: [PATCH 13/13] drm/rockchip: Load crtc devices in preferred order
+Date: Sat, 15 Jun 2024 17:04:04 +0000
+
+On RK3399 the VOPL loaded before VOPB and gets registered as crtc-0.
+However, on RK3288 and PX30 VOPB is gets registered as crtc-0 instead of
+VOPL.
+
+With VOPL registered as crtc-0 the kernel kms client is not able to
+enable 4K display modes for console use on RK3399.
+
+Load VOPB before VOPL to help kernel kms client make use of 4K display
+modes for console use on RK3399.
+
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 23 +++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index ab55d7132550..6492f3caf017 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -354,11 +354,34 @@ static void rockchip_drm_match_remove(struct device *dev)
+ 		device_link_del(link);
+ }
+ 
++/* list of preferred vop devices */
++static const char *const rockchip_drm_match_preferred[] = {
++	"rockchip,rk3399-vop-big",
++	NULL,
++};
++
+ static struct component_match *rockchip_drm_match_add(struct device *dev)
+ {
+ 	struct component_match *match = NULL;
++	struct device_node *port;
+ 	int i;
+ 
++	/* add preferred vop device match before adding driver device matches */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(dev->of_node, "ports", i);
++		if (!port)
++			break;
++
++		if (of_device_is_available(port->parent) &&
++		    of_device_compatible_match(port->parent,
++					       rockchip_drm_match_preferred))
++			drm_of_component_match_add(dev, &match,
++						   component_compare_of,
++						   port->parent);
++
++		of_node_put(port);
++	}
++
+ 	for (i = 0; i < num_rockchip_sub_drivers; i++) {
+ 		struct platform_driver *drv = rockchip_sub_drivers[i];
+ 		struct device *p = NULL, *d;
