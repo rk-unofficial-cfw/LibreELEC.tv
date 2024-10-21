@@ -47,3 +47,5 @@
     ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES rockchip-firmware irq-balancer RTL8192FU "
 
     IR_REMOTE_KEYMAPS=" rockchip_remote "
+
+    WIRELESS_DAEMON="wpa_supplicant"
