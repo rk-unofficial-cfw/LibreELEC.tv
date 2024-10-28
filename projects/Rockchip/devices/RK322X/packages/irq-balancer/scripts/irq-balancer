@@ -1,11 +1,11 @@
 #!/bin/sh
 
 # graphics and multimedia stack
-#echo 2 > /proc/irq/$(awk -F":" "/20030000.video-codec/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
-#echo 2 > /proc/irq/$(awk -F":" "/pp0/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
-#echo 2 > /proc/irq/$(awk -F":" "/gp$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
-#echo 2 > /proc/irq/$(awk -F":" "/20050000.vop$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
-#echo 2 > /proc/irq/$(awk -F":" "/20070000.iep$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 2 > /proc/irq/$(awk -F":" "/20030000.video-codec/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 2 > /proc/irq/$(awk -F":" "/pp0/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 2 > /proc/irq/$(awk -F":" "/gp$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 2 > /proc/irq/$(awk -F":" "/20050000.vop$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 2 > /proc/irq/$(awk -F":" "/20070000.iep$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
 # usb stack
 echo 4 > /proc/irq/$(awk -F":" "/:usb1/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
 echo 4 > /proc/irq/$(awk -F":" "/:usb2/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
@@ -15,6 +15,6 @@ echo 4 > /proc/irq/$(awk -F":" "/:usb5/ {print \$1}" < /proc/interrupts | sed 's
 echo 4 > /proc/irq/$(awk -F":" "/:usb6/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
 echo 4 > /proc/irq/$(awk -F":" "/:usb7/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
 # network stack
-#echo 8 > /proc/irq/$(awk -F":" "/30010000.mmc$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
-#echo 8 > /proc/irq/$(awk -F":" "/eth0/ {print \$1}" < /proc/interrupts | sed 's/\ //g' | head -n1)/smp_affinity
+echo 8 > /proc/irq/$(awk -F":" "/30010000.mmc$/ {print \$1}" < /proc/interrupts | sed 's/\ //g')/smp_affinity
+echo 8 > /proc/irq/$(awk -F":" "/eth0/ {print \$1}" < /proc/interrupts | sed 's/\ //g' | head -n1)/smp_affinity
 
