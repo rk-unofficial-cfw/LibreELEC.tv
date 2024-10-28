@@ -1,0 +1,37 @@
+diff -ruPN linux/drivers/leds/led-class.c linux-new/drivers/leds/led-class.c
+--- linux/drivers/leds/led-class.c	2023-08-11 12:08:27.000000000 +0200
++++ linux-new/drivers/leds/led-class.c	2023-09-28 18:56:46.822821117 +0200
+@@ -362,6 +362,9 @@
+ 			if (fwnode_property_present(init_data->fwnode,
+ 						    "retain-state-shutdown"))
+ 				led_cdev->flags |= LED_RETAIN_AT_SHUTDOWN;
++			if (fwnode_property_present(init_data->fwnode,
++						    "enable-state-shutdown"))
++				led_cdev->flags |= LED_ENABLE_AT_SHUTDOWN;
+
+	    fwnode_property_read_u32(init_data->fwnode,
+		"max-brightness",
+diff -ruPN linux/drivers/leds/leds-gpio.c linux-new/drivers/leds/leds-gpio.c
+--- linux/drivers/leds/leds-gpio.c	2023-08-11 12:08:27.000000000 +0200
++++ linux-new/drivers/leds/leds-gpio.c	2023-09-28 18:58:09.997824599 +0200
+@@ -293,6 +293,9 @@
+ 
+ 		if (!(led->cdev.flags & LED_RETAIN_AT_SHUTDOWN))
+ 			gpio_led_set(&led->cdev, LED_OFF);
++		if ((led->cdev.flags & LED_ENABLE_AT_SHUTDOWN))
++			gpio_led_set(&led->cdev, LED_FULL);
++		
+ 	}
+ }
+ 
+diff -ruPN linux/include/linux/leds.h linux-new/include/linux/leds.h
+--- linux/include/linux/leds.h	2023-08-11 12:08:27.000000000 +0200
++++ linux-new/include/linux/leds.h	2023-09-28 18:18:54.678725996 +0200
+@@ -85,6 +85,7 @@
+ #define LED_BRIGHT_HW_CHANGED	BIT(21)
+ #define LED_RETAIN_AT_SHUTDOWN	BIT(22)
+ #define LED_INIT_DEFAULT_TRIGGER BIT(23)
++#define LED_ENABLE_AT_SHUTDOWN BIT(24)
+ 
+ 	/* set_brightness_work / blink_timer flags, atomic, private. */
+ 	unsigned long		work_flags;
