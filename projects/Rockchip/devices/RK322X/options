@@ -19,11 +19,11 @@
   # SquashFS compression method (gzip / lzo / xz / zstd)
     SQUASHFS_COMPRESSION="lzo"
 
-    UBOOT_FIRMWARE+=" optee-os"
-    OPTEE_PLATFORM="rockchip-rk322x"
+  # UBOOT_FIRMWARE+=" optee-os"
+  # OPTEE_PLATFORM="rockchip-rk322x"
 
   # Additional kernel make parameters (for example to specify the u-boot loadaddress)
-#    KERNEL_MAKE_EXTRACMD=" rockchip/rk3229-xms6.dtb"
+  # KERNEL_MAKE_EXTRACMD=" rockchip/rk3229-xms6.dtb"
     KERNEL_MAKE_EXTRACMD=" rockchip/rk322x-box.dtb \
 	rockchip/rk322x-box-t95d.dtb \
 	rockchip/rk322x-box-onetv-lite.dtb \
@@ -44,7 +44,7 @@
   # set the addon project
     ADDON_PROJECT="ARMv7"
 
-    ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES rockchip-firmware irq-balancer RTL8192FU "
+    ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES rockchip-firmware irq-balancer RTL8192FU openvfd-driver"
 
     IR_REMOTE_KEYMAPS=" rockchip_remote "
 
