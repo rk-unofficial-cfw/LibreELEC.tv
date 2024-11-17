@@ -16,6 +16,7 @@
     </category>
     <category id="audio">
       <group id="3">
+        <visible>true</visible>
         <setting id="audiooutput.passthrough">
           <visible>true</visible>
           <default>true</default>
