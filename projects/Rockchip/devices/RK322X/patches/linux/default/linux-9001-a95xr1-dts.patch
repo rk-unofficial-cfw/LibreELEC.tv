@@ -1,0 +1,58 @@
+diff -ruPN linux-old/arch/arm/boot/dts/rockchip/rk322x-box-a95xr1.dts linux/arch/arm/boot/dts/rockchip/rk322x-box-a95xr1.dts
+--- /dev/null	2025-01-06 10:17:07.467999996 +0100
++++ linux/arch/arm/boot/dts/rockchip/rk322x-box-a95xr1.dts	2025-01-06 23:46:00.126768116 +0100
+@@ -0,0 +1,53 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++
++/ {
++	model = "RK3229 A95X-R1";
++	compatible = "rockchip,rk322x-box-a95xr1", "rockchip,rk3229";
++
++	leds {
++		compatible = "gpio-leds";
++
++		blue_led {
++			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		red_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			enable-state-shutdown;
++			linux,default-trigger = "rc-feedback";
++		};
++	};
++};
++
++&cpu0_opp_table {
++
++	opp-1104000000 {
++		status = "okay";
++	};
++
++	opp-1200000000 {
++		status = "okay";
++	};
++
++};
++
++&dmc {
++	status = "okay";
++};
++
++&dmc_opp_table {
++	opp-666000000 {
++		status = "okay";
++	};
++};
++
++&emmc {
++	status = "okay";
++};
++

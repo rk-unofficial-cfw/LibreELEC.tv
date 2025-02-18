@@ -32,7 +32,8 @@
 	rockchip/rk322x-box-mxq4kpro.dtb \
 	rockchip/rk322x-box-mxq4kpro_r329q.dtb \
 	rockchip/rk322x-box-v884k.dtb \
-	rockchip/rk322x-box-v88mars.dtb"
+	rockchip/rk322x-box-v88mars.dtb \
+	rockchip/rk322x-box-a95xr1.dtb"
 
   # Mali GPU family
     MALI_FAMILY="400"
