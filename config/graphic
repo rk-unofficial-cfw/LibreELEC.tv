@@ -74,7 +74,7 @@ get_graphicdrivers() {
   fi
 
   if listcontains "${GRAPHIC_DRIVERS}" "lima"; then
-    GALLIUM_DRIVERS+=" kmsro lima"
+    GALLIUM_DRIVERS+=" lima"
     V4L2_SUPPORT="yes"
   fi
 
