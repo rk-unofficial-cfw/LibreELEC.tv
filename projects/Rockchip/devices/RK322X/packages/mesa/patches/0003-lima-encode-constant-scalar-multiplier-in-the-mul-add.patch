@@ -1,0 +1,206 @@
+From 657bd9b8f9c747b61dff9b9be84e19c1f684210f Mon Sep 17 00:00:00 2001
+From: sarbes <sarbes@kodi.tv>
+Date: Sun, 27 Apr 2025 22:57:15 +0200
+Subject: [PATCH] lima: encode constant scalar multiplier in the mul/add
+ instruction
+
+Utgard GPUs can encode a few selected scalar multipliers in the mul/add instruction. When applicable, it saves a mul and a load.
+
+v2:
+- fix mistake with the vec4 adder
+v3:
+- removed x16 modifier
+v4:
+- move shift to ppir_dest
+- prevent emmision of combine alu if shift is present
+---
+ src/gallium/drivers/lima/ir/pp/codegen.c | 10 +--
+ src/gallium/drivers/lima/ir/pp/instr.c   |  4 +-
+ src/gallium/drivers/lima/ir/pp/lower.c   | 80 ++++++++++++++++++++++++
+ src/gallium/drivers/lima/ir/pp/ppir.h    |  2 +-
+ 4 files changed, 88 insertions(+), 8 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/pp/codegen.c b/src/gallium/drivers/lima/ir/pp/codegen.c
+index 3d6db737915ba..3e266a4db0060 100644
+--- a/src/gallium/drivers/lima/ir/pp/codegen.c
++++ b/src/gallium/drivers/lima/ir/pp/codegen.c
+@@ -217,7 +217,7 @@ static ppir_codegen_outmod ppir_codegen_get_outmod(ppir_outmod outmod)
+ static unsigned shift_to_op(int shift)
+ {
+    assert(shift >= -3 && shift <= 3);
+-   return shift < 0 ? shift + 8 : shift;
++   return shift & 0x7;
+ }
+
+ static void ppir_codegen_encode_vec_mul(ppir_node *node, void *code)
+@@ -240,7 +240,7 @@ static void ppir_codegen_encode_vec_mul(ppir_node *node, void *code)
+
+    switch (node->op) {
+    case ppir_op_mul:
+-      f->op = shift_to_op(alu->shift);
++      f->op = shift_to_op(dest->shift);
+       break;
+    case ppir_op_mov:
+       f->op = ppir_codegen_vec4_mul_op_mov;
+@@ -316,7 +316,7 @@ static void ppir_codegen_encode_scl_mul(ppir_node *node, void *code)
+
+    switch (node->op) {
+    case ppir_op_mul:
+-      f->op = shift_to_op(alu->shift);
++      f->op = shift_to_op(dest->shift);
+       break;
+    case ppir_op_mov:
+       f->op = ppir_codegen_float_mul_op_mov;
+@@ -383,7 +383,7 @@ static void ppir_codegen_encode_vec_add(ppir_node *node, void *code)
+
+    switch (node->op) {
+    case ppir_op_add:
+-      f->op = ppir_codegen_vec4_acc_op_add;
++      f->op = shift_to_op(dest->shift);
+       break;
+    case ppir_op_mov:
+       f->op = ppir_codegen_vec4_acc_op_mov;
+@@ -473,7 +473,7 @@ static void ppir_codegen_encode_scl_add(ppir_node *node, void *code)
+
+    switch (node->op) {
+    case ppir_op_add:
+-      f->op = shift_to_op(alu->shift);
++      f->op = shift_to_op(dest->shift);
+       break;
+    case ppir_op_mov:
+       f->op = ppir_codegen_float_acc_op_mov;
+diff --git a/src/gallium/drivers/lima/ir/pp/instr.c b/src/gallium/drivers/lima/ir/pp/instr.c
+index 0befd2cd21af1..72ffc3a9a99ab 100644
+--- a/src/gallium/drivers/lima/ir/pp/instr.c
++++ b/src/gallium/drivers/lima/ir/pp/instr.c
+@@ -349,8 +349,8 @@ bool ppir_instr_insert_node(ppir_instr *instr, ppir_node *node)
+             if (dest->type == ppir_target_pipeline)
+                continue;
+
+-            /* No modifiers on vector output */
+-            if (node->op == ppir_op_mul && dest->modifier != ppir_outmod_none)
++            /* No modifiers/shift on vector output */
++            if (node->op == ppir_op_mul && (dest->modifier != ppir_outmod_none || dest->shift != 0))
+                continue;
+
+             /* No modifiers on vector source on combiner */
+diff --git a/src/gallium/drivers/lima/ir/pp/lower.c b/src/gallium/drivers/lima/ir/pp/lower.c
+index 8315b934795fc..c02c7a47de7bf 100644
+--- a/src/gallium/drivers/lima/ir/pp/lower.c
++++ b/src/gallium/drivers/lima/ir/pp/lower.c
+@@ -663,6 +663,85 @@ static bool ppir_lower_accum(ppir_block *block, ppir_node *node)
+    return true;
+ }
+
++static bool ppir_lower_fold_const_scalar_mul(ppir_block *block, ppir_node *node)
++{
++   /* add and mul instructions can encode a limited selection of scalar
++    * constants and multiply them in situe. E.g. (src[0] + src[1]) * 2. */
++   ppir_alu_node* alu_node = NULL;
++   ppir_const_node* const_node = NULL;
++
++   ppir_node_foreach_pred_safe(node, dep) {
++      ppir_node *p = dep->pred;
++      if (p->type == ppir_node_type_const)
++         const_node = ppir_node_to_const(p);
++      else if (p->type == ppir_node_type_alu)
++         alu_node = ppir_node_to_alu(p);
++   }
++
++   if (!alu_node || !const_node)
++      return false;
++
++   if (alu_node->node.op != ppir_op_add && alu_node->node.op != ppir_op_mul)
++      return false;
++
++   if (!ppir_node_has_single_succ(&alu_node->node))
++      return false;
++
++   // ppir_outmod_clamp_positive should be fine: max(x*n,0) == max(x,0)*n; for n >= 0
++   if (alu_node->dest.modifier == ppir_outmod_clamp_fraction || alu_node->dest.modifier == ppir_outmod_round)
++      return false;
++
++   if (const_node->constant.num != 1)
++      return false;
++
++   float scalar = const_node->constant.value[0].f;
++
++   if (scalar == 2.0f)
++      alu_node->dest.shift = 1;
++   else if (scalar == 4.0f)
++      alu_node->dest.shift = 2;
++   else if (scalar == 8.0f)
++      alu_node->dest.shift = 3;
++   else if (scalar == 1.0f/2.0f)
++      alu_node->dest.shift = -1;
++   else if (scalar == 1.0f/4.0f)
++      alu_node->dest.shift = -2;
++   else if (scalar == 1.0f/8.0f)
++      alu_node->dest.shift = -3;
++   else {
++      alu_node->dest.shift = 0;
++      return false;
++   }
++
++   alu_node->node.is_out |= node->is_out;
++
++   ppir_dest dest = ppir_node_to_alu(node)->dest;
++   if (!(alu_node->node.op == ppir_op_add && dest.type == ppir_target_pipeline))
++      alu_node->dest = dest;
++
++   ppir_node_replace_all_succ(&alu_node->node, node);
++
++   /* for all nodes after the scalar mul node */
++   ppir_node_foreach_succ_safe(node, dep) {
++      /* replace the scalar mul node with the pred alu */
++      ppir_node *p = dep->succ;
++      ppir_node_remove_dep(dep);
++      ppir_node_add_dep(p, &alu_node->node, ppir_dep_src);
++   }
++
++   ppir_node_delete(node);
++   ppir_node_delete(&const_node->node);
++
++   return true;
++}
++
++static bool ppir_lower_mul(ppir_block *block, ppir_node *node)
++{
++   /* check if we can fold a constant scalar */
++   ppir_lower_fold_const_scalar_mul(block, node);
++   return true;
++}
++
+ static bool (*ppir_lower_funcs[ppir_op_num])(ppir_block *, ppir_node *) = {
+    [ppir_op_abs] = ppir_lower_abs,
+    [ppir_op_neg] = ppir_lower_neg,
+@@ -684,6 +763,7 @@ static bool (*ppir_lower_funcs[ppir_op_num])(ppir_block *, ppir_node *) = {
+    [ppir_op_min] = ppir_lower_accum,
+    [ppir_op_eq] = ppir_lower_accum,
+    [ppir_op_ne] = ppir_lower_accum,
++   [ppir_op_mul] = ppir_lower_mul,
+ };
+
+ bool ppir_lower_prog(ppir_compiler *comp)
+diff --git a/src/gallium/drivers/lima/ir/pp/ppir.h b/src/gallium/drivers/lima/ir/pp/ppir.h
+index ee4e49ae77c23..083f9a148e69f 100644
+--- a/src/gallium/drivers/lima/ir/pp/ppir.h
++++ b/src/gallium/drivers/lima/ir/pp/ppir.h
+@@ -294,6 +294,7 @@ typedef struct ppir_dest {
+
+    ppir_outmod modifier;
+    unsigned write_mask : 4;
++   int shift;
+ } ppir_dest;
+
+ typedef struct {
+@@ -301,7 +302,6 @@ typedef struct {
+    ppir_dest dest;
+    ppir_src src[3];
+    int num_src;
+-   int shift : 3; /* Only used for ppir_op_mul */
+ } ppir_alu_node;
+
+ typedef struct ppir_const {
+--
+GitLab
