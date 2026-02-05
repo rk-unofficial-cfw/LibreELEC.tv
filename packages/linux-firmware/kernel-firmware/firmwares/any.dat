@@ -23,3 +23,4 @@ rtl_bt/*
 rtlwifi/*
 rtw88/*
 rtw89/*
+rtl_nic/*
