@@ -1,0 +1,169 @@
+From e6af6844af22f0807add87c89b36713857c7f596 Mon Sep 17 00:00:00 2001
+From: sarbes <sarbes@kodi.tv>
+Date: Thu, 17 Apr 2025 15:13:59 +0200
+Subject: [PATCH] lima: encode constant lod/bias in the texture instruction
+
+Encoding the constant in the texture instruction avoids loading the constant, and potentially saves one cycle.
+---
+ src/gallium/drivers/lima/ir/pp/codegen.c | 18 +++--------------
+ src/gallium/drivers/lima/ir/pp/codegen.h | 25 ++++++++++--------------
+ src/gallium/drivers/lima/ir/pp/disasm.c  | 15 +++-----------
+ src/gallium/drivers/lima/ir/pp/nir.c     | 23 +++++++++++++++-------
+ src/gallium/drivers/lima/ir/pp/ppir.h    |  3 ++-
+ 5 files changed, 34 insertions(+), 50 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/ir/pp/codegen.c b/src/gallium/drivers/lima/ir/pp/codegen.c
+index 3d6db737915ba..047d8cafce586 100644
+--- a/src/gallium/drivers/lima/ir/pp/codegen.c
++++ b/src/gallium/drivers/lima/ir/pp/codegen.c
+@@ -149,24 +149,12 @@ static void ppir_codegen_encode_texld(ppir_node *node, void *code)
+ 
+    f->index = ldtex->sampler;
+ 
+-   f->lod_bias_en = ldtex->lod_bias_en;
++   f->lod_bias_register = ldtex->lod_bias_register;
+    f->explicit_lod = ldtex->explicit_lod;
+-   if (ldtex->lod_bias_en)
++   if (ldtex->lod_bias_register)
+       f->lod_bias = ppir_target_get_src_reg_index(&ldtex->src[1]);
+ 
+-   switch (ldtex->sampler_dim) {
+-   case GLSL_SAMPLER_DIM_2D:
+-   case GLSL_SAMPLER_DIM_3D:
+-   case GLSL_SAMPLER_DIM_RECT:
+-   case GLSL_SAMPLER_DIM_EXTERNAL:
+-      f->type = ppir_codegen_sampler_type_generic;
+-      break;
+-   case GLSL_SAMPLER_DIM_CUBE:
+-      f->type = ppir_codegen_sampler_type_cube;
+-      break;
+-   default:
+-      break;
+-   }
++   f->constant_lod_bias = ldtex->constant_lod_bias * 16.f;
+ 
+    f->offset_en = 0;
+    f->unknown_2 = 0x39001;
+diff --git a/src/gallium/drivers/lima/ir/pp/codegen.h b/src/gallium/drivers/lima/ir/pp/codegen.h
+index 055e952f5fc06..b4eece779d7e8 100644
+--- a/src/gallium/drivers/lima/ir/pp/codegen.h
++++ b/src/gallium/drivers/lima/ir/pp/codegen.h
+@@ -103,22 +103,17 @@ typedef union __attribute__((__packed__)) {
+    } reg;
+ } ppir_codegen_field_varying;
+ 
+-typedef enum {
+-   ppir_codegen_sampler_type_generic = 0x00,
+-   ppir_codegen_sampler_type_cube    = 0x1F,
+-} ppir_codegen_sampler_type;
+-
+ typedef struct __attribute__((__packed__)) {
+-   unsigned                  lod_bias     :  6;
+-   unsigned                  index_offset :  6;
+-   unsigned                  unknown_0    :  5; /* = 00000 */
+-   bool                      explicit_lod :  1;
+-   bool                      lod_bias_en  :  1;
+-   unsigned                  unknown_1    :  5; /* = 00000 */
+-   ppir_codegen_sampler_type type         :  5;
+-   bool                      offset_en    :  1;
+-   unsigned                  index        : 12;
+-   unsigned                  unknown_2    : 20; /* = 0011 1001 0000 0000 0001 */
++   unsigned lod_bias          :  6;
++   unsigned index_offset      :  6;
++   unsigned unknown_0         :  5; /* = 00000 */
++   bool     explicit_lod      :  1;
++   bool     lod_bias_register :  1;
++   unsigned unknown_1         :  1; /* = 0 */
++   signed   constant_lod_bias :  9;
++   bool     offset_en         :  1;
++   unsigned index             : 12;
++   unsigned unknown_2         : 20; /* = 0011 1001 0000 0000 0001 */
+ } ppir_codegen_field_sampler;
+ 
+ typedef enum {
+diff --git a/src/gallium/drivers/lima/ir/pp/disasm.c b/src/gallium/drivers/lima/ir/pp/disasm.c
+index 7bf62384c1595..f84acc311b095 100644
+--- a/src/gallium/drivers/lima/ir/pp/disasm.c
++++ b/src/gallium/drivers/lima/ir/pp/disasm.c
+@@ -281,19 +281,10 @@ print_sampler(void *code, unsigned offset, FILE *fp)
+    ppir_codegen_field_sampler *sampler = code;
+ 
+    fprintf(fp, "texld");
+-   if (sampler->lod_bias_en)
++   if (sampler->lod_bias_register)
+       fprintf(fp, ".b");
+ 
+-   switch (sampler->type) {
+-   case ppir_codegen_sampler_type_generic:
+-      break;
+-   case ppir_codegen_sampler_type_cube:
+-      fprintf(fp, ".cube");
+-      break;
+-   default:
+-      fprintf(fp, "_t%u", sampler->type);
+-      break;
+-   }
++   fprintf(fp, " bias%03x", sampler->constant_lod_bias & 0x1ff);
+ 
+    fprintf(fp, " %u", sampler->index);
+ 
+@@ -303,7 +294,7 @@ print_sampler(void *code, unsigned offset, FILE *fp)
+       print_source_scalar(sampler->index_offset, NULL, false, false, fp);
+    }
+ 
+-   if (sampler->lod_bias_en)
++   if (sampler->lod_bias_register)
+    {
+       fprintf(fp, " ");
+       print_source_scalar(sampler->lod_bias, NULL, false, false, fp);
+diff --git a/src/gallium/drivers/lima/ir/pp/nir.c b/src/gallium/drivers/lima/ir/pp/nir.c
+index edebab28167c6..f7c75193384eb 100644
+--- a/src/gallium/drivers/lima/ir/pp/nir.c
++++ b/src/gallium/drivers/lima/ir/pp/nir.c
+@@ -614,13 +614,22 @@ static bool ppir_emit_tex(ppir_block *block, nir_instr *ni)
+          node->num_src++;
+          break;
+       }
+-      case nir_tex_src_bias:
+-      case nir_tex_src_lod:
+-         node->lod_bias_en = true;
+-         node->explicit_lod = (instr->src[i].src_type == nir_tex_src_lod);
+-         ppir_node_add_src(block->comp, &node->node, &node->src[1], &instr->src[i].src, 1);
+-         node->num_src++;
+-         break;
++         case nir_tex_src_lod:
++            node->explicit_lod = true;
++            FALLTHROUGH;
++         case nir_tex_src_bias:
++            // the hardware seems to be able to do "texture2D(sampler, uv, 1.23 + bias)" as well
++            if (nir_src_is_const(instr->src[i].src) && instr->sampler_dim != GLSL_SAMPLER_DIM_CUBE)
++               node->constant_lod_bias = nir_src_as_float(instr->src[i].src);
++            else {
++               node->lod_bias_register = true;
++               ppir_node_add_src(block->comp, &node->node, &node->src[1], &instr->src[i].src, 1);
++               node->num_src++;
++               // for whatever reason, the blob biases cubemaps
++               if (instr->sampler_dim == GLSL_SAMPLER_DIM_CUBE && instr->src[i].src_type == nir_tex_src_bias)
++                  node->constant_lod_bias = -1.0f;
++            }
++            break;
+       default:
+          ppir_error("unsupported texture source type\n");
+          return false;
+diff --git a/src/gallium/drivers/lima/ir/pp/ppir.h b/src/gallium/drivers/lima/ir/pp/ppir.h
+index ee4e49ae77c23..d91befc7d00bb 100644
+--- a/src/gallium/drivers/lima/ir/pp/ppir.h
++++ b/src/gallium/drivers/lima/ir/pp/ppir.h
+@@ -346,7 +346,8 @@ typedef struct {
+    int num_src;
+    int sampler;
+    int sampler_dim;
+-   bool lod_bias_en;
++   float constant_lod_bias;
++   bool lod_bias_register;
+    bool explicit_lod;
+ } ppir_load_texture_node;
+ 
+-- 
+GitLab
+

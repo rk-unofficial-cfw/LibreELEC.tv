@@ -1,0 +1,175 @@
+diff -ruPN mesa-25.1.3/src/gallium/auxiliary/util/u_framebuffer.c mesa-new/src/gallium/auxiliary/util/u_framebuffer.c
+--- mesa-25.1.3/src/gallium/auxiliary/util/u_framebuffer.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/auxiliary/util/u_framebuffer.c	2025-06-22 09:23:07.304890312 +0200
+@@ -109,6 +109,8 @@
+ 
+       dst->nr_cbufs = src->nr_cbufs;
+ 
++      dst->flip_y = src->flip_y;
++
+       dst->viewmask = src->viewmask;
+       pipe_surface_reference(&dst->zsbuf, src->zsbuf);
+       pipe_resource_reference(&dst->resolve, src->resolve);
+@@ -124,6 +126,8 @@
+ 
+       dst->nr_cbufs = 0;
+ 
++      dst->flip_y = 0;
++
+       dst->viewmask = 0;
+ 
+       pipe_surface_reference(&dst->zsbuf, NULL);
+diff -ruPN mesa-25.1.3/src/gallium/auxiliary/util/u_screen.c mesa-new/src/gallium/auxiliary/util/u_screen.c
+--- mesa-25.1.3/src/gallium/auxiliary/util/u_screen.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/auxiliary/util/u_screen.c	2025-06-22 09:26:43.510881219 +0200
+@@ -184,6 +184,8 @@
+    caps->performance_monitor =
+       pscreen->get_driver_query_info && pscreen->get_driver_query_group_info &&
+       pscreen->get_driver_query_group_info(pscreen, 0, NULL) != 0;
++      
++   caps->y_flip = true;
+ }
+ 
+ uint64_t u_default_get_timestamp(UNUSED struct pipe_screen *screen)
+diff -ruPN mesa-25.1.3/src/gallium/drivers/lima/ir/pp/lower.c mesa-new/src/gallium/drivers/lima/ir/pp/lower.c
+--- mesa-25.1.3/src/gallium/drivers/lima/ir/pp/lower.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/drivers/lima/ir/pp/lower.c	2025-06-22 09:10:11.806922924 +0200
+@@ -147,13 +147,10 @@
+    assert(node->type == ppir_node_type_alu);
+    ppir_alu_node *alu = ppir_node_to_alu(node);
+ 
++   /* Follow the binary driver behavior which adds the negated
++    * argument as a second src to ddx/ddy */
+    alu->src[1] = alu->src[0];
+-   if (node->op == ppir_op_ddx)
+-      alu->src[1].negate = !alu->src[1].negate;
+-   else if (node->op == ppir_op_ddy)
+-      alu->src[0].negate = !alu->src[0].negate;
+-   else
+-      assert(0);
++   alu->src[1].negate = !alu->src[1].negate;
+ 
+    alu->num_src = 2;
+ 
+diff -ruPN mesa-25.1.3/src/gallium/drivers/lima/lima_job.c mesa-new/src/gallium/drivers/lima/lima_job.c
+--- mesa-25.1.3/src/gallium/drivers/lima/lima_job.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/drivers/lima/lima_job.c	2025-06-22 09:18:20.331902380 +0200
+@@ -63,14 +63,15 @@
+    if (!surf) {
+       /* We don't have neither cbuf nor zsbuf, use dimensions from ctx */
+       fb->width = ctx->framebuffer.base.width;
+-      fb->height =  ctx->framebuffer.base.height;
++      fb->height =  ctx->framebuffer.base.height;      
+    } else {
+       uint16_t width, height;
+       pipe_surface_size(&surf->base, &width, &height);
+       fb->width = width;
+       fb->height = height;
+    }
+-
++   
++   fb->flip_y = ctx->framebuffer.base.flip_y;
+    int width = align(fb->width, 16) >> 4;
+    int height = align(fb->height, 16) >> 4;
+ 
+@@ -839,11 +840,26 @@
+    frame->fragment_stack_size = job->pp_max_stack_size << 16 | job->pp_max_stack_size;
+ 
+    /* related with MSAA and different value when r4p0/r7p0 */
+-   frame->supersampled_height = fb->height * 2 - 1;
+-   frame->scale = 0xE0C;
++   if (fb->flip_y)
++      frame->supersampled_height = fb->height * 2 - 1;
++   else
++      frame->supersampled_height = 1;
++
++   frame->scale = 0x00C;
++   if (fb->flip_y) {
++      /* 11: flip derivative y
++       * 10: flip fragcoord y
++       *  9: flip dithering */
++      frame->scale |= (1<<11) | (1<<10) | (1<<9);
++   }
+ 
+    frame->dubya = 0x77;
+-   frame->onscreen = 1;
++
++   if (fb->flip_y)
++      frame->onscreen = 1;
++   else
++      frame->onscreen = 0;
++
+    frame->blocking = (fb->shift_min << 28) | (fb->shift_h << 16) | fb->shift_w;
+ 
+    /* Set default layout to 8888 */
+diff -ruPN mesa-25.1.3/src/gallium/drivers/lima/lima_job.h mesa-new/src/gallium/drivers/lima/lima_job.h
+--- mesa-25.1.3/src/gallium/drivers/lima/lima_job.h	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/drivers/lima/lima_job.h	2025-06-22 09:15:11.116910337 +0200
+@@ -57,6 +57,7 @@
+    int shift_w, shift_h;
+    int block_w, block_h;
+    int shift_min;
++   int flip_y;
+ };
+ 
+ struct lima_job {
+diff -ruPN mesa-25.1.3/src/gallium/drivers/lima/lima_screen.c mesa-new/src/gallium/drivers/lima/lima_screen.c
+--- mesa-25.1.3/src/gallium/drivers/lima/lima_screen.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/drivers/lima/lima_screen.c	2025-06-22 09:26:49.823880954 +0200
+@@ -212,6 +212,7 @@
+    caps->max_texture_anisotropy = 16.0f;
+ 
+    caps->max_texture_lod_bias = 15.0f;
++   caps->y_flip = false;
+ }
+ 
+ static bool
+diff -ruPN mesa-25.1.3/src/gallium/include/pipe/p_defines.h mesa-new/src/gallium/include/pipe/p_defines.h
+--- mesa-25.1.3/src/gallium/include/pipe/p_defines.h	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/include/pipe/p_defines.h	2025-06-22 09:26:34.999881577 +0200
+@@ -1112,6 +1112,7 @@
+    float min_conservative_raster_dilate;
+    float max_conservative_raster_dilate;
+    float conservative_raster_dilate_granularity;
++   bool y_flip;
+ };
+ 
+ /**
+diff -ruPN mesa-25.1.3/src/gallium/include/pipe/p_state.h mesa-new/src/gallium/include/pipe/p_state.h
+--- mesa-25.1.3/src/gallium/include/pipe/p_state.h	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/gallium/include/pipe/p_state.h	2025-06-22 09:20:24.527897157 +0200
+@@ -418,7 +418,7 @@
+    struct pipe_surface *cbufs[PIPE_MAX_COLOR_BUFS];
+ 
+    struct pipe_surface *zsbuf;      /**< Z/stencil buffer */
+-
++   bool flip_y; /**< Flip Y coordinates (fragcoord, derivatives, etc) */
+    struct pipe_resource *resolve;
+ };
+ 
+diff -ruPN mesa-25.1.3/src/mesa/state_tracker/st_atom_framebuffer.c mesa-new/src/mesa/state_tracker/st_atom_framebuffer.c
+--- mesa-25.1.3/src/mesa/state_tracker/st_atom_framebuffer.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/mesa/state_tracker/st_atom_framebuffer.c	2025-06-22 09:21:43.270893845 +0200
+@@ -225,6 +225,8 @@
+    if (framebuffer.height == USHRT_MAX)
+       framebuffer.height = 0;
+ 
++   framebuffer.flip_y = fb->FlipY;
++   
+    cso_set_framebuffer(st->cso_context, &framebuffer);
+ 
+    st->state.fb_width = framebuffer.width;
+diff -ruPN mesa-25.1.3/src/mesa/state_tracker/st_program.c mesa-new/src/mesa/state_tracker/st_program.c
+--- mesa-25.1.3/src/mesa/state_tracker/st_program.c	2025-06-07 15:47:15.000000000 +0200
++++ mesa-new/src/mesa/state_tracker/st_program.c	2025-06-22 09:29:23.604874487 +0200
+@@ -355,7 +355,9 @@
+    NIR_PASS(_, nir, nir_lower_reg_intrinsics_to_ssa);
+    nir_validate_shader(nir, "after st/ptn lower_reg_intrinsics_to_ssa");
+ 
+-   NIR_PASS(_, nir, st_nir_lower_wpos_ytransform, prog, screen);
++   if (screen->caps.y_flip) {
++	NIR_PASS(_, nir, st_nir_lower_wpos_ytransform, prog, screen);
++   }
+    NIR_PASS(_, nir, nir_lower_system_values);
+ 
+    struct nir_lower_compute_system_values_options cs_options = {
