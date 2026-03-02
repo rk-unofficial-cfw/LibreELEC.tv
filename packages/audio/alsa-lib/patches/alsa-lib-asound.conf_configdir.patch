@@ -9,6 +9,7 @@ index a04173a0..1f13fd84 100644
 -			"~/.asoundrc"
 +			"/run/asound.conf"
 +			"/storage/.config/asound.conf"
++			"/run/alsa/conf.d"
  			{
  				@func concat
  				strings [
