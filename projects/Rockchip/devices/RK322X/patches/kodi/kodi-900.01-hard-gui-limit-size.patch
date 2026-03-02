@@ -1,0 +1,22 @@
+diff -ruPN xbmc-6c9991b8615b04c43b80f16e4335881f4fa06a5e/xbmc/windowing/gbm/drm/DRMUtils.cpp xbmc-new/xbmc/windowing/gbm/drm/DRMUtils.cpp
+--- xbmc-6c9991b8615b04c43b80f16e4335881f4fa06a5e/xbmc/windowing/gbm/drm/DRMUtils.cpp	2023-08-29 08:25:43.000000000 +0200
++++ xbmc-new/xbmc/windowing/gbm/drm/DRMUtils.cpp	2023-09-11 17:16:35.205087250 +0200
+@@ -648,14 +648,13 @@
+ 
+   int limit = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt(
+       SETTING_VIDEOSCREEN_LIMITGUISIZE);
+-  if (limit > 0 && res.iScreenWidth > 1920 && res.iScreenHeight > 1080)
++  if (limit && limit == 1) {
++	res.iWidth = 1280;
++        res.iHeight = 720;
++  } else if (limit && res.iScreenWidth > 1920 && res.iScreenHeight > 1080)
+   {
+     switch (limit)
+     {
+-      case 1: // 720p
+-        res.iWidth = 1280;
+-        res.iHeight = 720;
+-        break;
+       case 2: // 1080p / 720p (>30hz)
+         res.iWidth = mode->vrefresh > 30 ? 1280 : 1920;
+         res.iHeight = mode->vrefresh > 30 ? 720 : 1080;

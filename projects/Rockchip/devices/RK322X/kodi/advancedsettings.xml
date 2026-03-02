@@ -1,0 +1,10 @@
+<advancedsettings version="1.0">
+ <gui>
+    <fronttobackrendering>false</fronttobackrendering>
+    <!-- algorithmdirtyregions>1</algorithmdirtyregions -->
+    <!-- hardwaredirtyregions>true</hardwaredirtyregions -->
+  </gui>
+<imageres>540</imageres>
+<fanartres>540</fanartres>
+<imagescalingalgorithm>bicubic</imagescalingalgorithm>
+</advancedsettings>
