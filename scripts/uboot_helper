@@ -285,6 +285,13 @@ devices = \
     },
   },
   'Rockchip': {
+   'RK322X': {
+      'rk322x': {
+        'dtb': 'rk322x-box.dtb',
+        'config': 'evb-rk3229_defconfig',
+        'rockchip_legacy_boot' : '1'
+      },
+    },
     'RK3288': {
       'miqi': {
         'dtb': 'rk3288-miqi.dtb',
