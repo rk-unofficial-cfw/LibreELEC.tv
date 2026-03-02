@@ -1,0 +1,40 @@
+diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k_r29.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k_r29.dts
+--- linux/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k_r29.dts	1970-01-01 01:00:00.000000000 +0100
++++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k_r29.dts	2024-05-15 19:17:00.274011021 +0200
+@@ -0,0 +1,36 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++
++/ {
++	model = "RK3228 mxq4k box r29 variant";
++	compatible = "rockchip,rk322x-box-mxq4k_r29", "rockchip,rk3228";
++
++	leds {
++		compatible = "gpio-leds";
++
++		blue_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++		
++		red_led {
++			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			enable-state-shutdown;
++			linux,default-trigger = "rc-feedback";
++		};
++	};
++};
++
++&dmc {
++	status = "okay";
++};
++
++&emmc {
++	max-frequency = <50000000>;
++};

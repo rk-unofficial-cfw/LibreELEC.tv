@@ -1,0 +1,66 @@
+diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts
+--- linux/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts	1970-01-01 01:00:00.000000000 +0100
++++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts	2025-09-09 23:23:58.386266812 +0200
+@@ -0,0 +1,62 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++
++/ {
++	model = "RK3229 T95Vpro";
++	compatible = "rockchip,rk322x-box-t95vpro", "rockchip,rk3229";
++
++	leds {
++		compatible = "gpio-leds";
++
++		blue_led {
++			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		red_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			enable-state-shutdown;
++			linux,default-trigger = "rc-feedback";
++		};
++	};
++};
++
++&cpu0_opp_table {
++	opp-1104000000 {
++		status = "okay";
++	};
++
++	opp-1200000000 {
++		status = "okay";
++	};
++};
++
++&dmc {
++	status = "okay";
++};
++
++&dram_timing {
++	sr_idle = <24>;
++	pd_idle = <32>;
++	ddr3_drv = <DDR3_DS_40ohm>;
++	ddr3_odt = <DDR3_ODT_120ohm>;
++	phy_ddr3_clk_drv = <PHY_DDR3_RON_RTT_34ohm>;
++	phy_ddr3_cmd_drv = <PHY_DDR3_RON_RTT_34ohm>;
++	phy_ddr3_dqs_drv = <PHY_DDR3_RON_RTT_34ohm>;
++	phy_ddr3_odt = <PHY_DDR3_RON_RTT_225ohm>;
++};
++
++&emmc {
++	status = "okay";
++};
++
++&uart1 {
++	bluetooth {
++		compatible = "realtek,rtl8723cs-bt";
++	};
++};
