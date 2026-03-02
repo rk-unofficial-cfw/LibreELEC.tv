@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: 2024-2025 @borine <https://github.com/borine/>
+# SPDX-License-Identifier: MIT
+
+[Unit]
+Description=BlueALSA ALSA configuration service
+Documentation=man:bluealsa-autoconfig(8)
+After=dbus.service
+
+# In order to customize BlueALSA ALSA configuration service one should create an
+# override for this systemd unit file. Please note, that in the override file
+# one will have to explicitly clear the ExecStart before setting it again.
+#
+# $ sudo systemctl edit bluealsa-autoconfig
+# [Service]
+# ExecStart=
+# ExecStart=/usr/bin/bluealsa-autoconfig --udev --default-pcm
+
+[Service]
+Type=simple
+RuntimeDirectory=bluealsa-autoconfig
+ExecStart=/usr/bin/bluealsa-autoconfig --udev
+Restart=on-failure
+
+# Sandboxing
+CapabilityBoundingSet=
+DeviceAllow=
+IPAddressDeny=any
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateNetwork=true
+PrivateTmp=true
+PrivateUsers=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+RuntimeDirectory=alsa/conf.d/
+ReadWritePaths=/sys/class/sound/controlC0/uevent /run/alsa/conf.d
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+SystemCallFilter=@system-service
+SystemCallFilter=~@resources @privileged
+UMask=0077
+
+[Install]
+WantedBy=sound.target
