@@ -1,0 +1,27 @@
+diff -ruPN u-boot-2025.07/arch/arm/dts/rk3229-evb.dts u-boot-new/arch/arm/dts/rk3229-evb.dts
+--- u-boot-2025.07/arch/arm/dts/rk3229-evb.dts	2025-07-07 17:48:28.000000000 +0200
++++ u-boot-new/arch/arm/dts/rk3229-evb.dts	2026-03-02 08:55:39.257974000 +0100
+@@ -10,7 +10,8 @@
+ 	compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
+ 
+ 	aliases {
+-		mmc0 = &emmc;
++		mmc0 = &sdmmc;
++		mmc1 = &emmc;
+ 	};
+ 
+ 	memory@60000000 {
+@@ -191,6 +192,13 @@
+ 	status = "okay";
+ };
+ 
++&sdmmc {
++	cap-sd-highspeed;
++	status = "okay";
++	cd-gpios = <&gpio1 RK_PC1 GPIO_ACTIVE_LOW>;
++	cd-debounce-delay-ms = <500>;
++};
++
+ &tsadc {
+ 	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
+ 	status = "okay";
