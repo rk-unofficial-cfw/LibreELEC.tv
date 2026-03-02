@@ -1,0 +1,12 @@
+[Unit]
+Description=Configure irq
+Before=kodi.service
+After=network-online.target graphical.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/irq-balancer
+
+[Install]
+WantedBy=kodi.target
