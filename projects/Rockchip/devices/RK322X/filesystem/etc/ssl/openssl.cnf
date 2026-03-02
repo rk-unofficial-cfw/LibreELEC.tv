@@ -1,0 +1,11 @@
+openssl_conf=openssl_conf
+
+[openssl_conf]
+engines=engines
+
+[engines]
+afalg=afalg
+
+[afalg]
+# Leave this alone and configure algorithms with CIPERS/DIGESTS below
+default_algorithms=ALL
