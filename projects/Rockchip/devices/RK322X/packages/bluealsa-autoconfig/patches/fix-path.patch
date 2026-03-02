@@ -1,0 +1,26 @@
+diff -ruPN bluealsa-autoconfig-c55a355beb9fe74c0b01fd21ece18120aeda433b/autoconfig-filepaths.h bluealsa-autconfig-new/autoconfig-filepaths.h
+--- bluealsa-autoconfig-c55a355beb9fe74c0b01fd21ece18120aeda433b/autoconfig-filepaths.h	2026-01-27 20:34:14.000000000 +0100
++++ bluealsa-autconfig-new/autoconfig-filepaths.h	2026-02-20 21:31:00.088836790 +0100
+@@ -8,7 +8,7 @@
+ #ifndef BLUEALSA_AUTOCONFIG_FILEPATHS_H
+ #define BLUEALSA_AUTOCONFIG_FILEPATHS_H
+ 
+-#define BLUEALSA_AUTOCONFIG_CONFIG_DIR "/var/lib/alsa/conf.d"
++#define BLUEALSA_AUTOCONFIG_CONFIG_DIR "/run/alsa/conf.d"
+ #define BLUEALSA_AUTOCONFIG_CONFIG_FILE BLUEALSA_AUTOCONFIG_CONFIG_DIR "/bluealsa-autoconfig.conf"
+ #define BLUEALSA_AUTOCONFIG_TEMP_FILE BLUEALSA_AUTOCONFIG_CONFIG_DIR "/.bluealsa-autoconfig.tmp"
+ 
+diff -ruPN bluealsa-autoconfig-c55a355beb9fe74c0b01fd21ece18120aeda433b/meson.build bluealsa-autconfig-new/meson.build
+--- bluealsa-autoconfig-c55a355beb9fe74c0b01fd21ece18120aeda433b/meson.build	2026-01-27 20:34:14.000000000 +0100
++++ bluealsa-autconfig-new/meson.build	2026-02-21 12:41:19.528788916 +0100
+@@ -64,7 +64,7 @@
+ 	install_dir: bindir,
+ )
+ 
+-alsa_plugin_dir = alsa_dep.get_variable(pkgconfig : 'libdir') / 'alsa-lib'
++alsa_plugin_dir = prefix / 'lib/alsa'
+ 
+ asound_module_sources = [
+ 	'bluealsa-hook.c',
+
+ 
