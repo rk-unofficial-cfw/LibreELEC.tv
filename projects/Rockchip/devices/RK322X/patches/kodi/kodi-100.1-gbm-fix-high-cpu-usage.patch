@@ -1,0 +1,12 @@
+diff -ruPN xbmc-20.0-Nexus/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp xbmc-new/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp
+--- xbmc-20.0-Nexus/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp	2023-01-15 10:13:34.000000000 +0100
++++ xbmc-new/xbmc/windowing/gbm/WinSystemGbmGLESContext.cpp	2023-03-10 12:46:44.741174652 +0100
+@@ -149,7 +149,7 @@
+   }
+   else
+   {
+-    KODI::TIME::Sleep(10ms);
++    KODI::TIME::Sleep(40ms);
+   }
+ }
+ 
