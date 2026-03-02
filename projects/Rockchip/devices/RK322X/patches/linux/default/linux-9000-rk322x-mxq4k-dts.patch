@@ -1,0 +1,68 @@
+diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k.dts
+--- linux/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k.dts	1970-01-01 01:00:00.000000000 +0100
++++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-mxq4k.dts	2024-06-09 07:53:01.569912570 +0200
+@@ -0,0 +1,64 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++
++/ {
++	model = "RK3228 MXQ4K";
++	compatible = "rockchip,rk322x-box-mxq4k", "rockchip,rk3229";
++
++	leds {
++		compatible = "gpio-leds";
++
++		blue_led {
++			gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++		
++		red_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++                        enable-state-shutdown;
++                        linux,default-trigger = "rc-feedback";
++		};
++	};
++};
++
++&cpu0_opp_table {
++
++	opp-1104000000 {
++		status = "okay";
++	};
++
++	opp-1200000000 {
++		status = "okay";
++	};
++
++};
++
++&dmc {
++	status = "okay";
++};
++
++&dmc_opp_table {
++	opp-660000000 {
++		status = "okay";
++	};
++	
++	opp-700000000 {
++		status = "disabled";
++	};
++};
++
++&i2s1_bus {
++	rockchip,pins = <0 RK_PB0 1 &pcfg_pull_none>,
++			<0 RK_PB1 1 &pcfg_pull_none>,
++			<0 RK_PB3 1 &pcfg_pull_none>,
++			<0 RK_PB4 1 &pcfg_pull_none>,
++			<0 RK_PB5 1 &pcfg_pull_none>,
++			<0 RK_PB6 1 &pcfg_pull_none>,
++			<1 RK_PA4 2 &pcfg_pull_none>,
++			<1 RK_PA5 2 &pcfg_pull_none>;
++};

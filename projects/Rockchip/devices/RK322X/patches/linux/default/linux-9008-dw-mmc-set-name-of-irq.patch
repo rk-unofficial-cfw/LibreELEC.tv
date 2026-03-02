@@ -1,0 +1,12 @@
+diff -ruPN linux/drivers/mmc/host/dw_mmc.c linux-new/drivers/mmc/host/dw_mmc.c
+--- linux/drivers/mmc/host/dw_mmc.c	2023-11-20 11:52:19.000000000 +0100
++++ linux-new/drivers/mmc/host/dw_mmc.c	2023-12-05 18:56:42.971038136 +0100
+@@ -3439,7 +3439,7 @@
+ 
+ 	tasklet_setup(&host->tasklet, dw_mci_tasklet_func);
+ 	ret = devm_request_irq(host->dev, host->irq, dw_mci_interrupt,
+-			       host->irq_flags, "dw-mci", host);
++			       host->irq_flags, dev_name(host->dev), host);
+ 	if (ret)
+ 		goto err_dmaunmap;
+ 
