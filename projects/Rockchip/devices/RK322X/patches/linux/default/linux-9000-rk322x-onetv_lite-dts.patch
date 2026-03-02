@@ -1,0 +1,49 @@
+diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-onetv-lite.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-onetv-lite.dts
+--- linux/arch/arm/boot/dts/rockchip/rk322x-box-onetv-lite.dts	1970-01-01 01:00:00.000000000 +0100
++++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-onetv-lite.dts	2023-12-02 07:39:50.921337536 +0100
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++
++/ {
++	model = "RK3228 OneTv Lite";
++	compatible = "rockchip,rk322x-box-onetv-lite", "rockchip,rk3228";
++
++	leds {
++		compatible = "gpio-leds";
++
++		blue_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++
++		red_led {
++                        gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_LOW>;
++                        default-state = "off";
++                        enable-state-shutdown;
++                        linux,default-trigger = "rc-feedback";
++                };
++	};
++};
++
++&dmc {
++	status = "okay";
++};
++
++&dmc_opp_table {
++        opp-660000000 {
++                status = "okay";
++        };
++};
++
++&dram_timing {
++	ddr3_drv = <DDR3_DS_34ohm>;
++	phy_ddr3_clk_drv = <PHY_DDR3_RON_RTT_22ohm>;
++	phy_ddr3_cmd_drv = <PHY_DDR3_RON_RTT_22ohm>;
++	phy_ddr3_dqs_drv = <PHY_DDR3_RON_RTT_22ohm>;
++};

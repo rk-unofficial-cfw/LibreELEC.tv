@@ -1,0 +1,122 @@
+diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-t95d.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95d.dts
+--- linux/arch/arm/boot/dts/rockchip/rk322x-box-t95d.dts	1970-01-01 01:00:00.000000000 +0100
++++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95d.dts	2023-12-02 07:40:03.176338049 +0100
+@@ -0,0 +1,118 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++
++/dts-v1/;
++
++#include "rk322x-box.dtsi"
++#include "rk322x-opp.dtsi"
++#include "rk322x-legacy.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	model = "RK3228 T95D box";
++	compatible = "rockchip,rk322x-box-t95d", "rockchip,rk3228";
++
++	leds {
++		compatible = "gpio-leds";
++
++		red_led {
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			enable-state-shutdown;
++			default-state = "off";
++			linux,default-trigger = "rc-feedback";
++		};
++		
++		blue_led {
++			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	display_client: spi {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "spi-gpio";
++		sck-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
++		mosi-gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
++		cs-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
++		num-chipselects = <1>;
++
++		display-controller@0 {
++			compatible = "fdhisi,fd628";
++			reg = <0x0>;
++			spi-3wire;
++			spi-lsb-first;
++			spi-rx-delay-us = <1>;
++			spi-max-frequency = <500000>;
++
++			tm16xx,digits = [01 02 03 04];
++			tm16xx,segment-mapping = [03 04 05 00 01 02 06];
++
++			#address-cells = <2>;
++			#size-cells = <0>;
++			
++			led@0,0 {
++				reg = <0 0>;
++				function = LED_FUNCTION_ALARM;
++			};
++			
++			led@0,1 {
++				reg = <0 1>;
++				function = LED_FUNCTION_USB;
++			};
++			
++			led@0,2 {
++				reg = <0 2>;
++				function = "play";
++			};
++			
++			led@0,3 {
++				reg = <0 3>;
++				function = "pause";
++			};
++			
++			led@0,4 {
++				reg = <0 4>;
++				function = "colon";
++			};
++			
++			led@0,5 {
++				reg = <0 5>;
++				function = LED_FUNCTION_LAN;
++			};
++			
++			led@0,6 {
++				reg = <0 6>;
++				function = LED_FUNCTION_WLAN;
++			};
++
++		};
++	};
++};
++
++&cpu0_opp_table {
++	opp-1104000000 {
++		status = "okay";
++	};
++
++	opp-1200000000 {
++		status = "okay";
++	};
++};
++
++&dmc {
++	status = "okay";
++};
++
++&dram_timing {
++	phy_ddr3_clk_drv = <PHY_DDR3_RON_RTT_34ohm>;
++	phy_ddr3_cmd_drv = <PHY_DDR3_RON_RTT_34ohm>;
++	phy_ddr3_dqs_drv = <PHY_DDR3_RON_RTT_34ohm>;
++};
++
++&uart1 {
++	status = "okay";
++	bluetooth {
++		compatible = "brcm,bcm4345c5";
++	};
++};
