@@ -18,12 +18,12 @@ diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-h20.dts linux-new/arch/ar
 +		compatible = "gpio-leds";
 +
 +		blue_led {
-+			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
++			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
 +			default-state = "on";
 +		};
 +		
 +		red_led {
-+			gpios = <&gpio3 RK_PC5 GPIO_ACTIVE_HIGH>;
++			gpios = <&gpio1 RK_PA7 GPIO_ACTIVE_HIGH>;
 +			default-state = "off";
 +			enable-state-shutdown;
 +			linux,default-trigger = "rc-feedback";
