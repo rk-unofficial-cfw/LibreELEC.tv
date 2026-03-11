@@ -32,7 +32,7 @@
 	rockchip/rk322x-box-mxq4kpro_r329q.dtb \
 	rockchip/rk322x-box-v884k.dtb \
 	rockchip/rk322x-box-v88mars.dtb \
-	rockchip/rk322x-box-t95vpro.dtb
+	rockchip/rk322x-box-t95vpro.dtb \
 	rockchip/rk322x-box-a95xr1.dtb \
 	rockchip/rk322x-box-h20.dtb"
 
