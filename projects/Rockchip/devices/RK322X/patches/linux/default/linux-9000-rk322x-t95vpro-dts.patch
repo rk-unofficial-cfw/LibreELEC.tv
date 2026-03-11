@@ -1,7 +1,7 @@
 diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts
 --- linux/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts	1970-01-01 01:00:00.000000000 +0100
 +++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts	2025-09-09 23:23:58.386266812 +0200
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,65 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -62,5 +62,8 @@ diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box-t95vpro.dts linux-new/arc
 +&uart1 {
 +	bluetooth {
 +		compatible = "realtek,rtl8723cs-bt";
++		enable-gpios = <&gpio2 RK_PD5 GPIO_ACTIVE_HIGH>;
++		device-wake-gpios = <&gpio3 RK_PD3 GPIO_ACTIVE_HIGH>;
++		host-wake-gpios = <&gpio3 RK_PD2 GPIO_ACTIVE_HIGH>;
 +	};
 +};
