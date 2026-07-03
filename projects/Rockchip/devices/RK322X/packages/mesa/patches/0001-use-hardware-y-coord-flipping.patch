@@ -1,0 +1,98 @@
+diff -ruPN mesa-26.0.1/src/gallium/drivers/lima/ir/pp/lower.c mesa-26.0.1-new/src/gallium/drivers/lima/ir/pp/lower.c
+--- mesa-26.0.1/src/gallium/drivers/lima/ir/pp/lower.c	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/gallium/drivers/lima/ir/pp/lower.c	2026-03-10 22:01:30.614532136 +0100
+@@ -148,12 +148,14 @@
+    ppir_alu_node *alu = ppir_node_to_alu(node);
+ 
+    alu->src[1] = alu->src[0];
+-   if (node->op == ppir_op_ddx)
++   /*if (node->op == ppir_op_ddx)
+       alu->src[1].negate = !alu->src[1].negate;
+    else if (node->op == ppir_op_ddy)
+       alu->src[0].negate = !alu->src[0].negate;
+    else
+-      assert(0);
++      assert(0);*/
++
++   alu->src[1].negate = !alu->src[1].negate;
+ 
+    alu->num_src = 2;
+ 
+diff -ruPN mesa-26.0.1/src/gallium/drivers/lima/lima_job.c mesa-26.0.1-new/src/gallium/drivers/lima/lima_job.c
+--- mesa-26.0.1/src/gallium/drivers/lima/lima_job.c	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/gallium/drivers/lima/lima_job.c	2026-03-10 22:11:46.219542351 +0100
+@@ -812,6 +812,8 @@
+    struct lima_screen *screen = lima_screen(ctx->base.screen);
+    int wb_idx = 0;
+ 
++   fb->flip_y = ctx->framebuffer.base.flip_y;
++
+    lima_pack(frame_reg, PP_FRAME, frame) {
+       frame.render_address = screen->pp_buffer->va + pp_frame_rsw_offset;
+       frame.early_z = true;
+@@ -841,12 +843,12 @@
+       frame.fragment_stack_pointer_initial_value = job->pp_max_stack_size;
+ 
+       /* related with MSAA and different value when r4p0/r7p0 */
+-      frame.origin_y = fb->height * 2;
++      frame.origin_y = (fb->flip_y) ? fb->height * 2 : 1;
+       frame.scale_fragcoord = true;
+       frame.scale_derivatives = true;
+-      frame.flip_dithering_matrix = true;
+-      frame.flip_fragcoord = true;
+-      frame.flip_derivatives = true;
++      frame.flip_dithering_matrix = (fb->flip_y);
++      frame.flip_fragcoord = (fb->flip_y);
++      frame.flip_derivatives = (fb->flip_y);
+ 
+       frame.subpixel_specifier = 0x77;
+       frame.tiebreak_mode = 1;
+diff -ruPN mesa-26.0.1/src/gallium/drivers/lima/lima_job.h mesa-26.0.1-new/src/gallium/drivers/lima/lima_job.h
+--- mesa-26.0.1/src/gallium/drivers/lima/lima_job.h	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/gallium/drivers/lima/lima_job.h	2026-03-10 21:55:38.475526294 +0100
+@@ -61,6 +61,7 @@
+    int shift_w, shift_h;
+    int block_w, block_h;
+    int shift_min;
++   int flip_y;
+ };
+ 
+ struct lima_job {
+diff -ruPN mesa-26.0.1/src/gallium/include/pipe/p_state.h mesa-26.0.1-new/src/gallium/include/pipe/p_state.h
+--- mesa-26.0.1/src/gallium/include/pipe/p_state.h	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/gallium/include/pipe/p_state.h	2026-03-10 21:52:31.449523190 +0100
+@@ -442,7 +442,7 @@
+    struct pipe_surface cbufs[PIPE_MAX_COLOR_BUFS];
+ 
+    struct pipe_surface zsbuf;      /**< Z/stencil buffer */
+-
++   bool flip_y; /**< Flip Y coordinates (fragcoord, derivatives, etc) */
+    struct pipe_resource *resolve;
+ };
+ 
+diff -ruPN mesa-26.0.1/src/mesa/state_tracker/st_atom_framebuffer.c mesa-26.0.1-new/src/mesa/state_tracker/st_atom_framebuffer.c
+--- mesa-26.0.1/src/mesa/state_tracker/st_atom_framebuffer.c	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/mesa/state_tracker/st_atom_framebuffer.c	2026-03-10 22:09:16.532539867 +0100
+@@ -123,6 +123,7 @@
+    st_invalidate_readpix_cache(st);
+ 
+    st->state.fb_orientation = _mesa_fb_orientation(fb);
++   framebuffer.flip_y = (st->state.fb_orientation == Y_0_TOP);
+ 
+    /**
+     * Quantize the derived default number of samples:
+diff -ruPN mesa-26.0.1/src/mesa/state_tracker/st_glsl_to_nir.cpp mesa-26.0.1-new/src/mesa/state_tracker/st_glsl_to_nir.cpp
+--- mesa-26.0.1/src/mesa/state_tracker/st_glsl_to_nir.cpp	2026-02-25 16:54:24.000000000 +0100
++++ mesa-26.0.1-new/src/mesa/state_tracker/st_glsl_to_nir.cpp	2026-03-10 21:19:53.570490705 +0100
+@@ -557,9 +557,10 @@
+        * constants in GLSL. */
+       NIR_PASS(_, nir, gl_nir_lower_buffers, shader_program);
+ 
++	/*
+       NIR_PASS(_, nir, st_nir_lower_wpos_ytransform, shader->Program,
+                st->screen);
+-
++	*/
+       /* needed to lower base_workgroup_id and base_global_invocation_id */
+       struct nir_lower_compute_system_values_options cs_options = {};
+       NIR_PASS(_, nir, nir_lower_system_values);
