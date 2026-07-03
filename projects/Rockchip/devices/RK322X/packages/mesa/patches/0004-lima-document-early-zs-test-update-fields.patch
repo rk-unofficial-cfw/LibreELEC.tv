@@ -1,0 +1,50 @@
+From 86f7e2a11d2eeb3b639e6f4a071a9714923b8e23 Mon Sep 17 00:00:00 2001
+From: sarbes <sarbes@kodi.tv>
+Date: Sun, 30 Nov 2025 00:43:10 +0100
+Subject: [PATCH] lima: document early zs test/update fields
+
+The RSW has two fields for its early-zs culling. This MR specifies both.
+---
+ src/gallium/drivers/lima/genxml/common.xml | 4 ++--
+ src/gallium/drivers/lima/lima_draw.c       | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/gallium/drivers/lima/genxml/common.xml b/src/gallium/drivers/lima/genxml/common.xml
+index c7574d131283..0a38a337609d 100644
+--- a/src/gallium/drivers/lima/genxml/common.xml
++++ b/src/gallium/drivers/lima/genxml/common.xml
+@@ -337,8 +337,8 @@
+     <field name="Has Samplers" start="13:5" size="1" type="bool"/>
+     <field name="Unknown 5" start="13:6" size="1" type="bool"/>
+     <field name="Has Uniforms" start="13:7" size="1" type="bool"/>
+-    <field name="Unknown 6" start="13:8" size="1" type="bool"/>
+-    <field name="Early Z" start="13:9" size="1" type="bool"/>
++    <field name="Early ZS Test" start="13:8" size="1" type="bool"/>
++    <field name="Early ZS Update" start="13:9" size="1" type="bool"/>
+     <field name="Unknown 7" start="13:10" size="2" type="hex"/>
+     <field name="Pixel Kill" start="13:12" size="1" type="bool"/>
+     <field name="Unknown 8" start="13:13" size="1" type="bool"/>
+diff --git a/src/gallium/drivers/lima/lima_draw.c b/src/gallium/drivers/lima/lima_draw.c
+index 61031e38a359..de4408ba6987 100644
+--- a/src/gallium/drivers/lima/lima_draw.c
++++ b/src/gallium/drivers/lima/lima_draw.c
+@@ -735,14 +735,14 @@ lima_pack_render_state(struct lima_context *ctx, const struct pipe_draw_info *in
+       state.front_face_ccw = ctx->rasterizer->base.front_ccw;
+       state.dithering = ctx->blend->base.dither;
+ 
+-      state.early_z = true;
++      state.early_zs_update = true;
+       state.pixel_kill = true;
+ 
+       if (fs->state.uses_discard ||
+           ctx->zsa->base.alpha_enabled ||
+           fs->state.frag_depth_reg != -1 ||
+           ctx->blend->base.alpha_to_coverage) {
+-         state.early_z = false;
++         state.early_zs_update = false;
+          state.pixel_kill = false;
+       }
+ 
+-- 
+GitLab
+

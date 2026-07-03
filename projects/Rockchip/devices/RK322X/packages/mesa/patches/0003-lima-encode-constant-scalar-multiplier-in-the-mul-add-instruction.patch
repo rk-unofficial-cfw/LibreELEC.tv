@@ -1,6 +1,6 @@
-From 657bd9b8f9c747b61dff9b9be84e19c1f684210f Mon Sep 17 00:00:00 2001
+From 45ad36ac613fb799879c0aaf6c0a2a05140ff608 Mon Sep 17 00:00:00 2001
 From: sarbes <sarbes@kodi.tv>
-Date: Sun, 27 Apr 2025 22:57:15 +0200
+Date: Mon, 28 Jul 2025 02:53:03 +0200
 Subject: [PATCH] lima: encode constant scalar multiplier in the mul/add
  instruction
 
@@ -13,6 +13,11 @@ v3:
 v4:
 - move shift to ppir_dest
 - prevent emmision of combine alu if shift is present
+v5:
+- corrected typo in comment
+
+Reviewed-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34717>
 ---
  src/gallium/drivers/lima/ir/pp/codegen.c | 10 +--
  src/gallium/drivers/lima/ir/pp/instr.c   |  4 +-
@@ -21,7 +26,7 @@ v4:
  4 files changed, 88 insertions(+), 8 deletions(-)
 
 diff --git a/src/gallium/drivers/lima/ir/pp/codegen.c b/src/gallium/drivers/lima/ir/pp/codegen.c
-index 3d6db737915ba..3e266a4db0060 100644
+index 6c8d40c4f940..f096ed974d0f 100644
 --- a/src/gallium/drivers/lima/ir/pp/codegen.c
 +++ b/src/gallium/drivers/lima/ir/pp/codegen.c
 @@ -217,7 +217,7 @@ static ppir_codegen_outmod ppir_codegen_get_outmod(ppir_outmod outmod)
@@ -70,7 +75,7 @@ index 3d6db737915ba..3e266a4db0060 100644
     case ppir_op_mov:
        f->op = ppir_codegen_float_acc_op_mov;
 diff --git a/src/gallium/drivers/lima/ir/pp/instr.c b/src/gallium/drivers/lima/ir/pp/instr.c
-index 0befd2cd21af1..72ffc3a9a99ab 100644
+index 0befd2cd21af..72ffc3a9a99a 100644
 --- a/src/gallium/drivers/lima/ir/pp/instr.c
 +++ b/src/gallium/drivers/lima/ir/pp/instr.c
 @@ -349,8 +349,8 @@ bool ppir_instr_insert_node(ppir_instr *instr, ppir_node *node)
@@ -85,7 +90,7 @@ index 0befd2cd21af1..72ffc3a9a99ab 100644
  
              /* No modifiers on vector source on combiner */
 diff --git a/src/gallium/drivers/lima/ir/pp/lower.c b/src/gallium/drivers/lima/ir/pp/lower.c
-index 8315b934795fc..c02c7a47de7bf 100644
+index 8315b934795f..21278e74a8e8 100644
 --- a/src/gallium/drivers/lima/ir/pp/lower.c
 +++ b/src/gallium/drivers/lima/ir/pp/lower.c
 @@ -663,6 +663,85 @@ static bool ppir_lower_accum(ppir_block *block, ppir_node *node)
@@ -95,7 +100,7 @@ index 8315b934795fc..c02c7a47de7bf 100644
 +static bool ppir_lower_fold_const_scalar_mul(ppir_block *block, ppir_node *node)
 +{
 +   /* add and mul instructions can encode a limited selection of scalar
-+    * constants and multiply them in situe. E.g. (src[0] + src[1]) * 2. */
++    * constants and multiply them in situ. E.g. (src[0] + src[1]) * 2. */
 +   ppir_alu_node* alu_node = NULL;
 +   ppir_const_node* const_node = NULL;
 +
@@ -183,7 +188,7 @@ index 8315b934795fc..c02c7a47de7bf 100644
  
  bool ppir_lower_prog(ppir_compiler *comp)
 diff --git a/src/gallium/drivers/lima/ir/pp/ppir.h b/src/gallium/drivers/lima/ir/pp/ppir.h
-index ee4e49ae77c23..083f9a148e69f 100644
+index ee4e49ae77c2..083f9a148e69 100644
 --- a/src/gallium/drivers/lima/ir/pp/ppir.h
 +++ b/src/gallium/drivers/lima/ir/pp/ppir.h
 @@ -294,6 +294,7 @@ typedef struct ppir_dest {

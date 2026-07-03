@@ -1,9 +1,18 @@
-From e6af6844af22f0807add87c89b36713857c7f596 Mon Sep 17 00:00:00 2001
+From b045f93a3d1c35bb40b870767cb45c23235226bc Mon Sep 17 00:00:00 2001
 From: sarbes <sarbes@kodi.tv>
-Date: Thu, 17 Apr 2025 15:13:59 +0200
+Date: Mon, 22 Sep 2025 12:27:50 +0200
 Subject: [PATCH] lima: encode constant lod/bias in the texture instruction
 
 Encoding the constant in the texture instruction avoids loading the constant, and potentially saves one cycle.
+
+v2:
+- Use type "int" instead of "signed"
+
+v3:
+- Rebased
+
+Reviewed-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34581>
 ---
  src/gallium/drivers/lima/ir/pp/codegen.c | 18 +++--------------
  src/gallium/drivers/lima/ir/pp/codegen.h | 25 ++++++++++--------------
@@ -13,7 +22,7 @@ Encoding the constant in the texture instruction avoids loading the constant, an
  5 files changed, 34 insertions(+), 50 deletions(-)
 
 diff --git a/src/gallium/drivers/lima/ir/pp/codegen.c b/src/gallium/drivers/lima/ir/pp/codegen.c
-index 3d6db737915ba..047d8cafce586 100644
+index 6c8d40c4f940..d4733a6084dd 100644
 --- a/src/gallium/drivers/lima/ir/pp/codegen.c
 +++ b/src/gallium/drivers/lima/ir/pp/codegen.c
 @@ -149,24 +149,12 @@ static void ppir_codegen_encode_texld(ppir_node *node, void *code)
@@ -45,7 +54,7 @@ index 3d6db737915ba..047d8cafce586 100644
     f->offset_en = 0;
     f->unknown_2 = 0x39001;
 diff --git a/src/gallium/drivers/lima/ir/pp/codegen.h b/src/gallium/drivers/lima/ir/pp/codegen.h
-index 055e952f5fc06..b4eece779d7e8 100644
+index 055e952f5fc0..e03f5afd306d 100644
 --- a/src/gallium/drivers/lima/ir/pp/codegen.h
 +++ b/src/gallium/drivers/lima/ir/pp/codegen.h
 @@ -103,22 +103,17 @@ typedef union __attribute__((__packed__)) {
@@ -74,7 +83,7 @@ index 055e952f5fc06..b4eece779d7e8 100644
 +   bool     explicit_lod      :  1;
 +   bool     lod_bias_register :  1;
 +   unsigned unknown_1         :  1; /* = 0 */
-+   signed   constant_lod_bias :  9;
++   int      constant_lod_bias :  9;
 +   bool     offset_en         :  1;
 +   unsigned index             : 12;
 +   unsigned unknown_2         : 20; /* = 0011 1001 0000 0000 0001 */
@@ -82,7 +91,7 @@ index 055e952f5fc06..b4eece779d7e8 100644
  
  typedef enum {
 diff --git a/src/gallium/drivers/lima/ir/pp/disasm.c b/src/gallium/drivers/lima/ir/pp/disasm.c
-index 7bf62384c1595..f84acc311b095 100644
+index 7bf62384c159..f84acc311b09 100644
 --- a/src/gallium/drivers/lima/ir/pp/disasm.c
 +++ b/src/gallium/drivers/lima/ir/pp/disasm.c
 @@ -281,19 +281,10 @@ print_sampler(void *code, unsigned offset, FILE *fp)
@@ -117,7 +126,7 @@ index 7bf62384c1595..f84acc311b095 100644
        fprintf(fp, " ");
        print_source_scalar(sampler->lod_bias, NULL, false, false, fp);
 diff --git a/src/gallium/drivers/lima/ir/pp/nir.c b/src/gallium/drivers/lima/ir/pp/nir.c
-index edebab28167c6..f7c75193384eb 100644
+index 3fef9d247f6d..ffd20fbfefc5 100644
 --- a/src/gallium/drivers/lima/ir/pp/nir.c
 +++ b/src/gallium/drivers/lima/ir/pp/nir.c
 @@ -614,13 +614,22 @@ static bool ppir_emit_tex(ppir_block *block, nir_instr *ni)
@@ -151,7 +160,7 @@ index edebab28167c6..f7c75193384eb 100644
           ppir_error("unsupported texture source type\n");
           return false;
 diff --git a/src/gallium/drivers/lima/ir/pp/ppir.h b/src/gallium/drivers/lima/ir/pp/ppir.h
-index ee4e49ae77c23..d91befc7d00bb 100644
+index ee4e49ae77c2..d91befc7d00b 100644
 --- a/src/gallium/drivers/lima/ir/pp/ppir.h
 +++ b/src/gallium/drivers/lima/ir/pp/ppir.h
 @@ -346,7 +346,8 @@ typedef struct {
