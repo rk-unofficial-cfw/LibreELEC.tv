@@ -38,7 +38,7 @@ diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box.dts linux-new/arch/arm/bo
 diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box.dtsi linux-new/arch/arm/boot/dts/rockchip/rk322x-box.dtsi
 --- linux/arch/arm/boot/dts/rockchip/rk322x-box.dtsi	1970-01-01 01:00:00.000000000 +0100
 +++ linux-new/arch/arm/boot/dts/rockchip/rk322x-box.dtsi	2024-05-15 19:14:46.332005414 +0200
-@@ -0,0 +1,456 @@
+@@ -0,0 +1,461 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +#include <dt-bindings/input/input.h>
@@ -486,6 +486,11 @@ diff -ruPN linux/arch/arm/boot/dts/rockchip/rk322x-box.dtsi linux-new/arch/arm/b
 +&usb_otg {
 +	dr_mode = "host";
 +	status = "okay";
++};
++
++&vdec {
++		assigned-clocks = <&cru SCLK_VDEC_CABAC>, <&cru SCLK_VDEC_CORE>, <&cru ACLK_RKVDEC>;
++		assigned-clock-rates = <300000000>, <300000000>, <300000000>;
 +};
 +
 +&vop {
