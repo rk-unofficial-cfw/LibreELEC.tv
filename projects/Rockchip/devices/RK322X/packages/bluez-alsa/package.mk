@@ -3,13 +3,13 @@
 # Copyright (C) 2019-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="bluez-alsa"
-PKG_VERSION="6f70074dbed8fd343da1a2cad34ad478d6e03fba"
-PKG_SHA256="c507492922ce5198f6ce39f9e3c607c95afafcd821892282127f9e11c56d8253"
+PKG_VERSION="v5.0.0"
+PKG_SHA256="e1249cbebd24925c977814f62adab71f2ebd771e28e6a4ac58bb1ac97ce3beb5"
 PKG_LICENSE="GPL"
 PKG_SITE="https://github.com/Arkq/bluez-alsa"
 PKG_URL="https://github.com/Arkq/bluez-alsa/archive/${PKG_VERSION}.tar.gz"
 PKG_DEPENDS_TARGET="toolchain dbus alsa sbc bluez"
-PKG_LONGDESC="A free software implementation of an IEEE 802.11i supplicant."
+PKG_LONGDESC="Package for direct integration between BlueZ and ALSA"
 PKG_TOOLCHAIN="autotools"
 PKG_BUILD_FLAGS="+pic"
 

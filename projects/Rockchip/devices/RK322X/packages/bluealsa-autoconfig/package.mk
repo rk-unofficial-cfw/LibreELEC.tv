@@ -3,8 +3,8 @@
 # Copyright (C) 2019-present Team LibreELEC (https://libreelec.tv)
 
 PKG_NAME="bluealsa-autoconfig"
-PKG_VERSION="c55a355beb9fe74c0b01fd21ece18120aeda433b"
-PKG_SHA256="5739a284318ee114a24d6a66bad62e331bd8e7227a7c877a30956cdf2da25344"
+PKG_VERSION="175a71b2b724380c2c366f00fe119684fc568dd0"
+PKG_SHA256="4acba903c4865aadefeb4eda68f08a704891f7eacc7d16be61384fdc609d738c"
 PKG_LICENSE="GPL"
 PKG_SITE="https://github.com/Arkq/bluez-alsa"
 PKG_URL="https://github.com/borine/bluealsa-autoconfig/archive/${PKG_VERSION}.tar.gz"
