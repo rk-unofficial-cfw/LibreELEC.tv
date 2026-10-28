@@ -288,7 +288,7 @@ devices = \
    'RK322X': {
       'rk322x': {
         'dtb': 'rk322x-box.dtb',
-        'config': 'evb-rk3229_defconfig',
+        'config': 'box-rk322x_defconfig',
         'rockchip_legacy_boot' : '1'
       },
     },
